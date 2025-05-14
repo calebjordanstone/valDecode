@@ -1,2 +1,2 @@
 # valDecode
-Experiment code for 
+Task code for Representaton of Learned Value experiment
