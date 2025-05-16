@@ -33,7 +33,6 @@ DATETIME = datetime.now().strftime("%y%m%d%H%M")
 SUBID = 'sub-' + f'{int(expInfo["Subject Number"])}'.zfill(2)
 REFRATE = int(expInfo['Monitor Refresh Rate'])
 SCREEN = int(expInfo['Screen Number'])
-SESSION = expInfo['Session']
 FULLSCREEN = expInfo['Full Screen']
 
 # configure monitor
@@ -106,7 +105,7 @@ size_params = { # common parameters used to calculate stimulus size in pixels
     'screen_res': MONITOR.getSizePix(), 
     'screen_width': MONITOR.getWidth()
 }
-y_pos = dva_to_pix(2, **size_params) # stmuli to appear 3 degrees down from centre
+y_pos = dva_to_pix(2, **size_params) # stmuli to appear 2 degrees down from centre
 x_pos = dva_to_pix(5, **size_params) # stmuli to appear 5 degrees to left/right of centre
 CENTRE = [0, 0]
 LEFT = [-x_pos, -y_pos]
@@ -162,7 +161,7 @@ SOA_DUR = int(0.2*REFRATE)*4
 TAR_DUR = int(0.2*REFRATE)*4
 RES_DUR = int(1*REFRATE)*4
 FDB_DUR = int(0.5*REFRATE)*4
-FDB_DUR_LNG = int(1*REFRATE)*4
+# FDB_DUR_LNG = int(1*REFRATE)*4
 
 # create stimuli
 stim_params = { # common parameters used across stimuli
@@ -211,7 +210,6 @@ experimentDict = {
     'Date': DATETIME,
     'Refrate': REFRATE,
     'MonitorSize' : MONITOR.getSizePix(),
-    'Session': SESSION,
     'Subject': SUBID,
     'SubHighValColAssign': sub_col_assign_high}
 
@@ -239,7 +237,7 @@ instructText = {
 
 'intro_3': '''
     If you see the letter "A", press the response key that is on the OPPOSITE side to the circle.\n
-    "A" stands for responding "away" the circle. \n
+    "A" stands for responding "away" from the circle. \n
     So, if you see the letter "A", and the circle is on the LEFT side of the screen, you would press the "M" key. \n
     But if you see the letter "A", and the circle is on the RIGHT side, you would press the "C" key. \n\n\n
     Press space to continue. 
@@ -470,7 +468,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
     if block == NBLOCKSREWARD + 1:
         txt_stim.text = instructText['extinction']
     else:
-        txt_stim.text = f'This is Block {block}. \n\n Please keep your eyes on the fixation cross throughout each trial. \n\n Press space to continue.' 
+        txt_stim.text = f'This is Block {block}. \n\n Please keep your eyes on the fixation cross throughout each trial. \n\n Press space to begin.' 
     
     txt_idx = 0
     trg_rgb = dp.DPxTriggerToRGB(900 + block) # convert to RGB
@@ -681,12 +679,10 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             # collect user input 
             early_pressed = event.getKeys(keyList = RESPKEYS, timeStamped = clock)
             if early_pressed:
+                logging.warning('RESPONSE')
+                logging.flush()
                 response = early_pressed[0][0]
                 rt = early_pressed[0][1]
-                acc = 999
-                points = 0
-                trg_val += 58
-                txt_stim.text = 'Too fast!'
                 break
 
             # flip window once fourth quadrant is drawn
@@ -730,105 +726,54 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
                 logging.flush()
                 response = pressed[0][0]
                 rt = pressed[0][1]
-                if block <= NBLOCKSREWARD: # reward contingency blocks
-                    if trl_strc[trial][2] == LEFT: # stimulus on the left side of screen
-                        if (trl_strc[trial][1] == CON) & (response == 'c'): # congruent rule, correct response
-                            acc = 1
-                            if trl_strc[trial][0] == HIGH: # high value reward
-                                points = POINTS_HIGH
-                            elif trl_strc[trial][0] == LOW: # low value reward
-                                points = POINTS_LOW
-                        elif (trl_strc[trial][1] == CON) & (response == 'm'): # congruent rule, incorrect response
-                            acc = 0
-                            points = 0
-                        elif (trl_strc[trial][1] == INCON) & (response == 'm'): # congruent rule, correct response
-                            acc = 1
-                            if trl_strc[trial][0] == HIGH: # high value reward
-                                points = POINTS_HIGH
-                            elif trl_strc[trial][0] == LOW: # low value reward
-                                points = POINTS_LOW
-                        elif (trl_strc[trial][1] == INCON) & (response == 'c'):
-                            acc = 0
-                            points = 0
-                    elif trl_strc[trial][2] == RIGHT: # stimulus on the right side of screen
-                        if (trl_strc[trial][1] == CON) & (response == 'm'): # congruent rule, correct response
-                            acc = 1
-                            if trl_strc[trial][0] == HIGH: # high value reward
-                                points = POINTS_HIGH
-                            elif trl_strc[trial][0] == LOW: # high value reward
-                                points = POINTS_LOW
-                        elif (trl_strc[trial][1] == CON) & (response == 'c'): # congruent rule, incorrect response
-                            acc = 0
-                            points = 0
-                        elif (trl_strc[trial][1] == INCON) & (response == 'c'): # congruent rule, correct response
-                            acc = 1
-                            if trl_strc[trial][0] == HIGH: # high value reward
-                                points = POINTS_HIGH
-                            elif trl_strc[trial][0] == LOW: # high value reward
-                                points = POINTS_LOW
-                        elif (trl_strc[trial][1] == INCON) & (response == 'm'):
-                            acc = 0
-                            points = 0
-
-                elif block > NBLOCKSREWARD: # extinction blocks
-                    if trl_strc[trial][2] == LEFT: # stimulus on the left side of screen
-                        if (trl_strc[trial][1] == CON) & (response == 'c'): # congruent rule, correct response
-                            acc = 1
-                            points = POINTS_LOW
-                        elif (trl_strc[trial][1] == CON) & (response == 'm'): # congruent rule, incorrect response
-                            acc = 0
-                            points = 0
-                        elif (trl_strc[trial][1] == INCON) & (response == 'm'): # congruent rule, correct response
-                            acc = 1
-                            points = POINTS_LOW
-                        elif (trl_strc[trial][1] == INCON) & (response == 'c'):
-                            acc = 0
-                            points = 0
-                    elif trl_strc[trial][2] == RIGHT: # stimulus on the right side of screen
-                        if (trl_strc[trial][1] == CON) & (response== 'm'): # congruent rule, correct response
-                            acc = 1
-                            points = POINTS_LOW
-                        elif (trl_strc[trial][1] == CON) & (response== 'c'): # congruent rule, incorrect response
-                            acc = 0
-                            points = 0
-                        elif (trl_strc[trial][1] == INCON) & (response == 'c'): # congruent rule, correct response
-                            acc = 1
-                            points = POINTS_LOW
-                        elif (trl_strc[trial][1] == INCON) & (response == 'm'):
-                            acc = 0
-                            points = 0
-    
-                # assign points to feedback stimulus
-                if acc == 0:
-                    txt_stim.text = 'Incorrect!'
-                else:
-                    txt_stim.text = f'+ {points} points!'
-                
-                # update trigger value and send response trigger
-                if acc == 1:
-                    trg_val += 10
-                elif acc == 0:
-                    trg_val += 20
                 break
 
             # flip window once fourth quadrant is drawn
             if quad_idx == 3: 
                 win.flip()
 
-        if (not pressed) & (not early_pressed):
+        # calculate response accuracy and points if a response is  made
+        if (pressed) or (early_pressed):  
+            if trl_strc[trial][1] == CON:
+                if trl_strc[trial][2] == LEFT:
+                    cor_response = 'c'
+                elif trl_strc[trial][2] == RIGHT:
+                    cor_response = 'm'
+            elif trl_strc[trial][1] == INCON:
+                if trl_strc[trial][2] == LEFT:
+                    cor_response = 'm'
+                elif trl_strc[trial][2] == RIGHT:
+                    cor_response = 'c'
+            if cor_response == response:
+                acc = 1
+            elif cor_response != response:
+                acc = 0
+            # update points, tiggers, and feedback display 
+            if acc == 0:
+                points = 0
+                txt_stim.text = 'Incorrect!'
+                trg_val += 20
+            elif acc == 1:
+                if block <= NBLOCKSREWARD:
+                    if trl_strc[trial][0] == HIGH: # high value reward
+                        points = POINTS_HIGH
+                    elif trl_strc[trial][0] == LOW: # low value reward
+                        points = POINTS_LOW
+                elif block > NBLOCKSREWARD:
+                    points = POINTS_LOW
+                txt_stim.text = f'+ {points} points!'
+                trg_val += 10   
+        # if no response made, assign missing values etc.     
+        elif (not pressed) & (not early_pressed):
             response = 999
             rt = 999
             acc = 999
             points = 0
             trg_val += 59
             txt_stim.text = 'Too slow!'
-
+        
         trg_rgb = dp.DPxTriggerToRGB(trg_val)
-        if early_pressed:
-            fdb_dur = FDB_DUR_LNG
-        else: 
-            fdb_dur = FDB_DUR
-        for frame in range(0, fdb_dur): # --------------------------------------------------- FDB ONSET
+        for frame in range(0, FDB_DUR): # --------------------------------------------------- FDB ONSET
 
             if frame == 0:
                 logging.warning('START_FDB')
@@ -851,7 +796,8 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             if quad_idx == 3: 
                 win.flip()
 
-        # recover some trial information
+        ## recover some trial information
+        # get string values for stimulus colour and value
         if sub_col_assign_high == 'BLUE':
             if trl_strc[trial][0] == BLUE:
                 stimColour = 'blue'
@@ -866,7 +812,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             elif trl_strc[trial][0] == ORANGE:
                 stimColour = 'orange'
                 stimVal = 'high'
-        
+        # get string value for  stimulus position
         if trl_strc[trial][2] == LEFT:
             stimPos = 'left'
         elif trl_strc[trial][2] == RIGHT:
@@ -887,6 +833,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         exp.addData('StimulusXY', trl_strc[trial][2])
         exp.addData('StimulusPosition', stimPos)
         exp.addData('ResponseRule', trl_strc[trial][1])
+        exp.addData('CorrectResponse', cor_response)
         exp.addData('Response', response)
         exp.addData('RT', rt)
         exp.addData('Accuracy', acc)

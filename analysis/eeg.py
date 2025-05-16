@@ -187,7 +187,7 @@ epochs = mne.Epochs(
     raw=avRef,
     events=eeg_events,
     event_id=event_dict,
-    tmin=-0.2, 
+    tmin=-1, # -0.2
     tmax=1.7, 
     baseline=(-0.2, 0), 
     decim=raw.info['sfreq']/256,
@@ -196,45 +196,73 @@ epochs = mne.Epochs(
     flat=None,
     reject_by_annotation=False,
     on_missing='warn')
-
+epochs_cue = epochs['cue']
 
 ## Check ERPs -------------------------------------------
-picks = ['O1', 'O2', 'Oz', 'Iz']
-epochs["cue"].plot_image(picks=picks, combine="mean")
-tar_high = epochs["hi/cue"].average(picks=picks)
-tar_low= epochs["lo/cue"].average(picks=picks)
-mne.viz.plot_compare_evokeds([tar_high, tar_low], 
-                             picks=picks, 
-                             combine='mean')
+# picks = ['O1', 'O2', 'Oz', 'Iz']
+# epochs["cue"].plot_image(picks=picks, combine="mean")
+# tar_high = epochs["hi/cue"].average(picks=picks)
+# tar_low= epochs["lo/cue"].average(picks=picks)
+# mne.viz.plot_compare_evokeds([tar_high, tar_low], 
+#                              picks=picks, 
+#                              combine='mean')
 
-picks = ['Fpz', 'Cz', 'CPz', 'Pz']
-epochs["tar"].plot_image(picks=picks, combine="mean")
-cue_to = epochs["to/tar"].average()
-cue_aw= epochs["aw/tar"].average()
-mne.viz.plot_compare_evokeds([cue_to, cue_aw], 
-                             picks=picks,
-                             combine='mean')
+# picks = ['Fpz', 'Cz', 'CPz', 'Pz']
+# epochs["tar"].plot_image(picks=picks, combine="mean")
+# cue_to = epochs["to/tar"].average()
+# cue_aw= epochs["aw/tar"].average()
+# mne.viz.plot_compare_evokeds([cue_to, cue_aw], 
+#                              picks=picks,
+#                              combine='mean')
 
-evks = epochs.average(by_event_type=True)
-mne.viz.plot_compare_evokeds([tar_high, tar_low], picks=picks)
+# evks = epochs.average(by_event_type=True)
+# mne.viz.plot_compare_evokeds([tar_high, tar_low], picks=picks)
 
-picks=['P2', 'P4', 'PO4', 'PO8', 'O2']
-picks = ['O1', 'O2', 'Oz', 'Iz']
-cue_hi_le= epochs["hi/le/cue"].average()
-cue_hi_ri= epochs["hi/ri/cue"].average()
-cue_lo_le= epochs["lo/le/cue"].average()
-cue_lo_ri= epochs["lo/ri/cue"].average()
-mne.viz.plot_compare_evokeds([cue_hi_le, cue_hi_ri, cue_lo_le, cue_lo_ri], 
-                             picks=picks,
-                             combine='mean')
+# picks=['P2', 'P4', 'PO4', 'PO8', 'O2']
+# picks = ['O1', 'O2', 'Oz', 'Iz']
+# cue_hi_le= epochs["hi/le/cue"].average()
+# cue_hi_ri= epochs["hi/ri/cue"].average()
+# cue_lo_le= epochs["lo/le/cue"].average()
+# cue_lo_ri= epochs["lo/ri/cue"].average()
+# mne.viz.plot_compare_evokeds([cue_hi_le, cue_hi_ri, cue_lo_le, cue_lo_ri], 
+#                              picks=picks,
+#                              combine='mean')
 
-biosemi_montage = mne.channels.make_standard_montage("biosemi64")
-biosemi_montage.plot()  
+# biosemi_montage = mne.channels.make_standard_montage("biosemi64")
+# biosemi_montage.plot()  
 
+## Extract time-frequency representations for decoding 
+# extract time-frequency representations 
+freqs = np.geomspace(3, 35, 30)
+n_cycles = np.linspace(3, 10, 30)
+power = epochs_cue.compute_tfr(
+    method="morlet",
+    freqs=freqs,
+    n_cycles=n_cycles,
+    average=False)
+
+# average over frequency bands
+power_data = power.get_data() 
+times = (power.times >= -0.2) & (power.times <= 1.2)
+power_data = power_data[:, :, :, times] # trim to 1 sec
+# define bands
+delta = freqs < 4
+theta = (freqs >= 4) & (freqs < 8)
+alpha = (freqs >= 8) & (freqs < 13) 
+beta = (freqs >= 13) & (freqs < 30)
+gamma = freqs >= 30
+power_ind_freqs = [power_data[:, :, band, :].mean(2) # average over all freqncies within a band
+                    for band in [delta, theta, alpha, beta, gamma]]
+z_scrd_lst = []
+for band in power_ind_freqs:
+    z_scrd = [sp.stats.zscore(band[:, :, t], axis=1) 
+                for t in range(0, band.shape[2])] # z-score across electodes for each epoch and time point, separately for each freqency band
+    z_scrd_lst.append(np.moveaxis(np.array(z_scrd), 0, -1))
+X = np.concatenate(z_scrd_lst, 1) # put back to shape n_epochs x n_features(freqs x chans) x n_times
 
 ## Check decoding ---------------------------------------------
 # get indicies of classes
-epochs_cue = epochs['cue']
+# epochs_cue = epochs['cue']
 epochs_cue.selection = np.arange(0, len(epochs_cue))
 # response rule
 epochs_To = epochs_cue['to'].selection

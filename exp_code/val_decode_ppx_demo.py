@@ -61,22 +61,6 @@ else:
         core.quit()
 
 ## ======================================================================
-## Create data paths
-## ======================================================================
-# # DATAPATH = 'C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/data/'
-# DATAPATH = '/home/experimenter/Experiments/val_decode/data/'
-# os.mkdir(DATAPATH + SUBID)
-# folders = ['/beh/', '/eeg/']
-# for folder in folders:
-#     os.mkdir(DATAPATH + SUBID + folder)
-# FILENAME = f'{SUBID}_task-{EXPERIMENT}_beh.txt'
-# LOGFILENAME = f'{SUBID}_task-{EXPERIMENT}_log.txt'
-# FRMSFILENAME = f'{SUBID}_task-{EXPERIMENT}_frms.txt'
-# FILEPATH = DATAPATH + SUBID + folders[0] + FILENAME
-# LOGFILEPATH = DATAPATH + SUBID + folders[0] + LOGFILENAME
-# FRMSFILEPATH = DATAPATH + SUBID + folders[0] + FRMSFILENAME
-# logging.LogFile(LOGFILEPATH)
-## ======================================================================
 ## Create window, stimuli, and other experiment features
 ## ======================================================================
 # create window
@@ -134,7 +118,7 @@ INCON = 'A' # respond away from the stimulus
 
 # define keys
 RESPKEYS = ['c', 'm']
-QUITKEYS = ['escape', 'q']
+QUITKEYS = ['escape']
 CONKEYS = ['space']
 
 # define points
@@ -142,7 +126,7 @@ POINTS_HIGH = 50
 POINTS_LOW = 5
 
 # define number of trials/blocks
-NTRIALS = 10 
+NTRIALS = 10
 NBLOCKS = 10
 
 # define timing (multiply all by 4 to account for increase in refrate from PROPixx)
@@ -151,9 +135,8 @@ CUE_DUR = int(0.3*REFRATE)*4
 SOA_DUR = int(0.2*REFRATE)*4
 TAR_DUR = int(0.2*REFRATE)*4
 RES_DUR = int(1*REFRATE)*4
-RES_DUR_LNG = int(20*REFRATE)*4
+RES_DUR_LNG = int(5*REFRATE)*4
 FDB_DUR = int(0.5*REFRATE)*4
-FDB_DUR_LNG = int(1*REFRATE)*4
 
 # create stimuli
 stim_params = { # common parameters used across stimuli
@@ -219,7 +202,7 @@ instructText = {
 
 'intro_3': '''
     If you see the letter "A", press the response key that is on the OPPOSITE side to the circle.\n
-    "A" stands for responding "away" the circle. \n
+    "A" stands for responding "away" from the circle. \n
     So, if you see the letter "A", and the circle is on the LEFT side of the screen, you would press the "M" key. \n
     But if you see the letter "A", and the circle is on the RIGHT side, you would press the "C" key. \n\n\n
     Press space to continue. 
@@ -229,12 +212,6 @@ instructText = {
     The circle will be either ORANGE or BLUE. \n
     If the circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
     If the circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n\n\n
-    Press space to continue.
-    ''',
-
-'deadline': '''
-    From now on, you will have a response deadline. \n
-    You will have 1 second to respond after you see the coloured circle. \n\n
     Press space to continue.
     '''
 }
@@ -379,10 +356,7 @@ cumulative_points = 0
 for block in range(1, NBLOCKS + 1): #------------------------------------------------- BLOCK ONSET
 
     # present instructions 
-    if block == 2:
-        txt_stim.text = instructText['deadline']
-    else:
-        txt_stim.text = f'This is Practice Block {block}. \n\n Press space to continue.' 
+    txt_stim.text = f'This is Practice Block {block}. \n\n Press space to start.' 
     txt_idx = 0
     while True:
 
@@ -510,11 +484,10 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             # collect user input 
             early_pressed = event.getKeys(keyList = RESPKEYS, timeStamped = clock)
             if early_pressed:
+                logging.warning('RESPONSE')
+                logging.flush()
                 response = early_pressed[0][0]
                 rt = early_pressed[0][1]
-                acc = np.nan
-                points = 0
-                txt_stim.text = 'Too fast!'
                 break
 
             # flip window once fourth quadrant is drawn
@@ -552,73 +525,46 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
                 logging.flush()
                 response = pressed[0][0]
                 rt = pressed[0][1]
-                if crc_stim_pos == LEFT: # stimulus on the left side of screen
-                    if (cue_stim.text == CON) & (pressed[0][0] == 'c'): # congruent rule, correct response
-                        acc = 1
-                        if np.all(crc_stim.fillColor == HIGH): # high value reward
-                            txt_stim.text = f'+ {POINTS_HIGH} points!'
-                            points = POINTS_HIGH
-                        elif np.all(crc_stim.fillColor == LOW): # low value reward
-                            txt_stim.text = f'+ {POINTS_LOW} points!'
-                            points = POINTS_LOW
-                    elif (cue_stim.text == CON) & (pressed[0][0] == 'm'): # congruent rule, incorrect response
-                        acc = 0
-                        txt_stim.text = 'Incorrect!'
-                        points = 0
-                    elif (cue_stim.text == INCON) & (pressed[0][0] == 'm'): # incongruent rule, correct response
-                        acc = 1
-                        if np.all(crc_stim.fillColor == HIGH): # high value reward
-                            txt_stim.text = f'+ {POINTS_HIGH} points!'
-                            points = POINTS_HIGH
-                        elif np.all(crc_stim.fillColor == LOW): # low value reward
-                            txt_stim.text = f'+ {POINTS_LOW} points!' 
-                            points = POINTS_LOW
-                    elif (cue_stim.text == INCON) & (pressed[0][0] == 'c'): # incongruent rule, incorrect response
-                        acc = 0
-                        txt_stim.text = 'Incorrect!'
-                        points = 0
-                elif crc_stim_pos == RIGHT: # stimulus on the right side of screen
-                    if (cue_stim.text == CON) & (pressed[0][0] == 'm'): # congruent rule, correct response
-                        acc = 1
-                        if np.all(crc_stim.fillColor == HIGH): # high value reward
-                            txt_stim.text = f'+ {POINTS_HIGH} points!'
-                            points = POINTS_HIGH
-                        elif np.all(crc_stim.fillColor == LOW): # high value reward
-                            txt_stim.text = f'+ {POINTS_LOW} points!'
-                            points = POINTS_LOW
-                    elif (cue_stim.text == CON) & (pressed[0][0] == 'c'): # congruent rule, incorrect response
-                        acc = 0
-                        txt_stim.text = 'Incorrect!'
-                        points = 0
-                    elif (cue_stim.text == INCON) & (pressed[0][0] == 'c'): # congruent rule, correct response
-                        acc = 1
-                        if np.all(crc_stim.fillColor == HIGH): # high value reward
-                            txt_stim.text = f'+ {POINTS_HIGH} points!'
-                            points = POINTS_HIGH
-                        elif np.all(crc_stim.fillColor == LOW): # high value reward
-                            txt_stim.text = f'+ {POINTS_LOW} points!'
-                            points = POINTS_LOW
-                    elif (cue_stim.text == INCON) & (pressed[0][0] == 'm'):
-                        acc = 0
-                        txt_stim.text = 'Incorrect!'
-                        points = 0
                 break
 
             # flip window once fourth quadrant is drawn
             if quad_idx == 3: 
                 win.flip()
-
-        if (not pressed) & (not early_pressed):
+        
+        # calculate response accuracy and points if a response is  made
+        if (pressed) or (early_pressed):  
+            if cue_stim.text == CON:
+                if crc_stim_pos == LEFT:
+                    cor_response = 'c'
+                elif crc_stim_pos == RIGHT:
+                    cor_response = 'm'
+            elif cue_stim.text == INCON:
+                if crc_stim_pos == LEFT:
+                    cor_response = 'm'
+                elif crc_stim_pos == RIGHT:
+                    cor_response = 'c'
+            if cor_response == response:
+                acc = 1
+            elif cor_response != response:
+                acc = 0
+            # update points, tiggers, and feedback display 
+            if acc == 0:
+                points = 0
+                txt_stim.text = 'Incorrect!'
+            elif acc == 1:
+                if np.all(crc_stim.fillColor == HIGH): # high value reward
+                    points = POINTS_HIGH
+                elif np.all(crc_stim.fillColor == LOW): # low value reward
+                    points = POINTS_LOW
+            txt_stim.text = f'+ {points} points!'
+        # if no response made, assign missing values etc.     
+        elif (not pressed) & (not early_pressed):
             response = 999
             rt = 999
-            acc = 0
+            acc = 999
             points = 0
             txt_stim.text = 'Too slow!'
-
-        if early_pressed:
-            fdb_dur = FDB_DUR_LNG
-        else: 
-            fdb_dur = FDB_DUR
+        
         for frame in range(0, FDB_DUR): # --------------------------------------------------- FDB ONSET
 
             if frame == 0:
@@ -634,7 +580,6 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             # flip window once fourth quadrant is drawn
             if quad_idx == 3: 
                 win.flip()
-
 
         # store accuracy data
         accList.append(acc)
