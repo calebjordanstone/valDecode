@@ -158,10 +158,10 @@ cents_per_point = total_reward / total_points
 ITI_RANGE = [int(0.8*REFRATE)*4, int(1*REFRATE)*4] 
 CUE_DUR = int(0.3*REFRATE)*4
 SOA_DUR = int(0.2*REFRATE)*4
-TAR_DUR = int(0.2*REFRATE)*4
+TAR_DUR = int(10*REFRATE)*4 #int(0.2*REFRATE)*4
 RES_DUR = int(1*REFRATE)*4
 FDB_DUR = int(0.5*REFRATE)*4
-# FDB_DUR_LNG = int(1*REFRATE)*4
+FDB_DUR_LNG = int(1.5*REFRATE)*4
 
 # create stimuli
 stim_params = { # common parameters used across stimuli
@@ -247,7 +247,7 @@ instructText = {
     The circle will be either ORANGE or BLUE. \n
     If the circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
     If the circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n
-    These points will be converted to additional reimbursement at the end of the experiment. \n\n\n
+    These points will be converted into additional reimbursement at the end of the experiment. \n\n\n
     Press space to continue.
     ''', 
 
@@ -732,18 +732,20 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             if quad_idx == 3: 
                 win.flip()
 
-        # calculate response accuracy and points if a response is  made
+        # calculate correct response
+        if trl_strc[trial][1] == CON:
+            if trl_strc[trial][2] == LEFT:
+                cor_response = 'c'
+            elif trl_strc[trial][2] == RIGHT:
+                cor_response = 'm'
+        elif trl_strc[trial][1] == INCON:
+            if trl_strc[trial][2] == LEFT:
+                cor_response = 'm'
+            elif trl_strc[trial][2] == RIGHT:
+                cor_response = 'c'
+
+        # calculate response accuracy and points if a response is made
         if (pressed) or (early_pressed):  
-            if trl_strc[trial][1] == CON:
-                if trl_strc[trial][2] == LEFT:
-                    cor_response = 'c'
-                elif trl_strc[trial][2] == RIGHT:
-                    cor_response = 'm'
-            elif trl_strc[trial][1] == INCON:
-                if trl_strc[trial][2] == LEFT:
-                    cor_response = 'm'
-                elif trl_strc[trial][2] == RIGHT:
-                    cor_response = 'c'
             if cor_response == response:
                 acc = 1
             elif cor_response != response:
@@ -751,8 +753,11 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             # update points, tiggers, and feedback display 
             if acc == 0:
                 points = 0
-                txt_stim.text = 'Incorrect!'
                 trg_val += 20
+                if early_pressed:
+                    txt_stim.text = 'Incorrect! \n No points. \n Slow down!'
+                elif pressed: 
+                    txt_stim.text = 'Incorrect! \n No points.'
             elif acc == 1:
                 if block <= NBLOCKSREWARD:
                     if trl_strc[trial][0] == HIGH: # high value reward
@@ -770,10 +775,14 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             acc = 999
             points = 0
             trg_val += 59
-            txt_stim.text = 'Too slow!'
+            txt_stim.text = 'Too slow! No points'
         
         trg_rgb = dp.DPxTriggerToRGB(trg_val)
-        for frame in range(0, FDB_DUR): # --------------------------------------------------- FDB ONSET
+        if acc != 1:
+            fdb_dur = FDB_DUR_LNG
+        elif acc == 1:
+            fdb_dur = FDB_DUR
+        for frame in range(0, fdb_dur): # --------------------------------------------------- FDB ONSET
 
             if frame == 0:
                 logging.warning('START_FDB')

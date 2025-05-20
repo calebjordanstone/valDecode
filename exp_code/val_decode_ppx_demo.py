@@ -137,6 +137,7 @@ TAR_DUR = int(0.2*REFRATE)*4
 RES_DUR = int(1*REFRATE)*4
 RES_DUR_LNG = int(5*REFRATE)*4
 FDB_DUR = int(0.5*REFRATE)*4
+FDB_DUR_LNG = int(1.5*REFRATE)*4
 
 # create stimuli
 stim_params = { # common parameters used across stimuli
@@ -148,7 +149,7 @@ stim_params = { # common parameters used across stimuli
 crc_stim_rad = dva_to_pix(dva=1.5, **size_params)
 crc_stim = visual.Circle(
     radius = crc_stim_rad,
-    edges = 500,
+    edges = 100,
     lineWidth = 0,
     **stim_params)
 txt_stim_height = dva_to_pix(dva=1, **size_params)
@@ -156,7 +157,7 @@ txt_stim = visual.TextStim(
     pos=CENTRE,
     color=WHITE,
     height=txt_stim_height,
-    wrapWidth=MONITOR.getSizePix()[0]/2*0.8,
+    wrapWidth=MONITOR.getSizePix()[0]/2*0.8, # 80% of width of screen
     **stim_params)
 fix_stim_height = dva_to_pix(dva=1, **size_params)
 fix_stim = visual.TextStim(
@@ -406,7 +407,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
 
         # housekeeping
         event.clearEvents()
-        logging.warning(f'START_TRIAL{trial}')
+        logging.warning(f'START_TRIAL_{trial}')
         logging.flush()
         # start stimulus presentation -------------------------------------------------- ITI ONSET
         for frame in range(0, ITI_DUR): 
@@ -531,18 +532,20 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             if quad_idx == 3: 
                 win.flip()
         
+        # calculate correct response
+        if cue_stim.text == CON:
+            if crc_stim_pos == LEFT:
+                cor_response = 'c'
+            elif crc_stim_pos == RIGHT:
+                cor_response = 'm'
+        elif cue_stim.text == INCON:
+            if crc_stim_pos == LEFT:
+                cor_response = 'm'
+            elif crc_stim_pos == RIGHT:
+                cor_response = 'c'
+
         # calculate response accuracy and points if a response is  made
         if (pressed) or (early_pressed):  
-            if cue_stim.text == CON:
-                if crc_stim_pos == LEFT:
-                    cor_response = 'c'
-                elif crc_stim_pos == RIGHT:
-                    cor_response = 'm'
-            elif cue_stim.text == INCON:
-                if crc_stim_pos == LEFT:
-                    cor_response = 'm'
-                elif crc_stim_pos == RIGHT:
-                    cor_response = 'c'
             if cor_response == response:
                 acc = 1
             elif cor_response != response:
@@ -550,22 +553,29 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             # update points, tiggers, and feedback display 
             if acc == 0:
                 points = 0
-                txt_stim.text = 'Incorrect!'
+                if early_pressed:
+                    txt_stim.text = 'Incorrect! \n No points. \n Slow down!'
+                elif pressed: 
+                    txt_stim.text = 'Incorrect! \n No points.'
             elif acc == 1:
                 if np.all(crc_stim.fillColor == HIGH): # high value reward
                     points = POINTS_HIGH
                 elif np.all(crc_stim.fillColor == LOW): # low value reward
                     points = POINTS_LOW
-            txt_stim.text = f'+ {points} points!'
+                txt_stim.text = f'+ {points} points!'
         # if no response made, assign missing values etc.     
         elif (not pressed) & (not early_pressed):
             response = 999
             rt = 999
-            acc = 999
+            acc = np.nan
             points = 0
-            txt_stim.text = 'Too slow!'
-        
-        for frame in range(0, FDB_DUR): # --------------------------------------------------- FDB ONSET
+            txt_stim.text = 'Too slow! No points'
+
+        if acc != 1:
+            fdb_dur = FDB_DUR_LNG
+        elif acc == 1:
+            fdb_dur = FDB_DUR
+        for frame in range(0, fdb_dur): # --------------------------------------------------- FDB ONSET
 
             if frame == 0:
                 logging.warning('START_FDB')
