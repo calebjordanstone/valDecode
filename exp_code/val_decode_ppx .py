@@ -113,9 +113,10 @@ RIGHT = [x_pos, -y_pos]
 TLC = [-win.size[0]/2, win.size[1]/2] # top left corer
 
 # define colours
-BLUE =   [37, 141, 165] #[0, 140, 255] ## check these are okay
-ORANGE = [193, 95, 30] #[255, 140, 0] ## check these are okay
+BLUE =   [37, 141, 165] 
+ORANGE = [194, 99, 32]
 WHITE = [255, 255, 255]
+GREY = [119, 119, 119]
 
 # Aassign high and low value to different colours
 if int(expInfo["Subject Number"]) % 2 == 0: # if even, assign high value stimulus to colour blue
@@ -171,10 +172,16 @@ stim_params = { # common parameters used across stimuli
     'contrast': 1,
     'colorSpace': 'rgb255'}
 crc_stim_rad = dva_to_pix(dva=1.5, **size_params)
-crc_stim = visual.Circle(
+dis_stim = visual.Circle(
     radius = crc_stim_rad,
     edges = 100,
     lineWidth = 0,
+    **stim_params)
+tar_stim = visual.Circle(
+    radius=crc_stim_rad,
+    edges=100,
+    lineWidth=0,
+    color=GREY,
     **stim_params)
 txt_stim_height = dva_to_pix(dva=1, **size_params)
 txt_stim = visual.TextStim(
@@ -221,31 +228,31 @@ instructText = {
 
 'INSTRUCTIONS_1': '''
     Welcome to our experiment! \n\n\n\
-    On every trial, you will see a letter followed by a coloured circle. \n
-    Depending on the letter and the location of the circle, you will need to press either the "C" or the "M" key. \n\n\n
+    On every trial, you will see a letter followed by a grey circle and a coloured circle presented side by side. \n
+    Depending on the letter and the location of the GREY circle, you will need to press either the "C" or the "M" key. \n\n\n
     Press space to continue. 
     ''',
 
 'INSTRUCTIONS_2': '''
-    If you see the letter "T", press the response key that is on the SAME side as the circle.\n
-    "T" stands for responding "toward" the circle.\n
-    So, if you see the letter "T", and the circle is on the LEFT side of the screen, you would press the "C" key.\n
-    But if you see the letter "T", and the circle is on the RIGHT side, you would press the "M" key. \n\n\n
+    If you see the letter "T", press the response key that is on the SAME side as the GREY circle.\n
+    "T" stands for responding "toward" the grey circle.\n
+    So, if you see the letter "T", and the grey circle is on the LEFT side of the screen, you would press the "C" key.\n
+    But if you see the letter "T", and the grey circle is on the RIGHT side, you would press the "M" key. \n\n\n
     Press space to continue. 
     ''',
 
 'INSTRUCTIONS_3': '''
-    If you see the letter "A", press the response key that is on the OPPOSITE side to the circle.\n
-    "A" stands for responding "away" from the circle. \n
-    So, if you see the letter "A", and the circle is on the LEFT side of the screen, you would press the "M" key. \n
-    But if you see the letter "A", and the circle is on the RIGHT side, you would press the "C" key. \n\n\n
+    If you see the letter "A", press the response key that is on the OPPOSITE side to the GREY circle.\n
+    "A" stands for responding "away" from the grey circle. \n
+    So, if you see the letter "A", and the grey circle is on the LEFT side of the screen, you would press the "M" key. \n
+    But if you see the letter "A", and the grey circle is on the RIGHT side, you would press the "C" key. \n\n\n
     Press space to continue. 
     ''',
 
 'INSTRUCTIONS_4': f'''
-    The circle will be either ORANGE or BLUE. \n
-    If the circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
-    If the circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n
+    The coloured circle will indicate how many points you can earn on that trial. \n
+    If the coloured circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
+    If the coloured circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n
     These points will be converted into additional reimbursement at the end of the experiment. \n\n\n
     Press space to continue.
     '''
@@ -274,7 +281,7 @@ else:
 # define trigger values
 '''
 Block number triggers:
-200 + block number. e.g., 201 = block 1
+900 + block number. e.g., 901 = block 1
 
 Trial number triggers:
 1 to nTrials. e.g., 1 = trial 1
@@ -282,7 +289,7 @@ Trial number triggers:
 Trial structure triggers:
 Stim value: H = high, L = low
 Rule cue: T = toward (congruent), A = away (incongruent)
-Stim location: L = left, R = right
+Target location: L = left, R = right
 HTL: 1xx
 HTR: 2xx
 HAL: 3xx
@@ -329,9 +336,9 @@ trl_stc = np.repeat(
     np.asarray(
         tuple(
             itertools.product(
-                [HIGH, LOW], # valuE   
+                [HIGH, LOW], # distractor value   
                 [CON, INCON], # rule
-                [LEFT, RIGHT])), # location  
+                [LEFT, RIGHT])), # target location  
             dtype = 'object'), 
     repeats=9, # number of each trial type per block
     axis=0)
@@ -380,7 +387,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
     while True:
 
         # draw trigger stimulus
-        if txt_idx == 0:
+        if txt_idx < 2:
             trig_stim.lineColor = trg_rgb
             trig_stim.draw()
 
@@ -425,11 +432,10 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         
         # send trial number trigger ----------------------------------------------------TRG ONSET
         trg_rgb = dp.DPxTriggerToRGB(trial + 1)
-        for frame in range(1): 
-
-            # logging
-            logging.warning('TRL_TRG')
-            logging.flush()
+        # logging
+        logging.warning('TRL_TRG')
+        logging.flush()
+        for frame in range(2): 
 
             # draw stimulus
             trig_stim.lineColor = trg_rgb
@@ -437,8 +443,12 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             win.flip()
         
         # set stimulus properties for this trial 
-        crc_stim.fillColor = trl_strc[trial][0]
-        crc_stim.pos= trl_strc[trial][2]
+        dis_stim.fillColor = trl_strc[trial][0]
+        tar_stim.pos= trl_strc[trial][2]
+        if np.all(tar_stim.pos == LEFT):
+            dis_stim.pos = RIGHT
+        elif np.all(tar_stim.pos == RIGHT):
+            dis_stim.pos = LEFT
         cue_stim.text = trl_strc[trial][1]
         ITI_DUR = np.random.randint(ITI_RANGE[0], ITI_RANGE[1])
         
@@ -456,12 +466,12 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         logging.flush()
 
         # start stimulus presentation -------------------------------------------------- ITI ONSET
+        logging.warning('START_ISI')
+        logging.flush()
         for frame in range(0, ITI_DUR): 
 
-            # send logs and trigger
-            if frame == 0:
-                logging.warning('START_ISI')
-                logging.flush()
+            # send trigger
+            if frame < 2:
                 trig_stim.lineColor = trg_rgb
                 trig_stim.draw()
 
@@ -472,12 +482,12 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         # update trigger value
         trg_val += 10
         trg_rgb = dp.DPxTriggerToRGB(trg_val)
+        logging.warning('START_CUE')
+        logging.flush()
         for frame in range(0, CUE_DUR): # ----------------------------------------------- CUE ONSET
 
-            # send logs and trigger
-            if frame == 0:
-                logging.warning('START_CUE')
-                logging.flush()
+            # send trigger
+            if frame < 2:
                 trig_stim.lineColor = trg_rgb
                 trig_stim.draw()
 
@@ -488,12 +498,12 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         # update trigger value
         trg_val += 10
         trg_rgb = dp.DPxTriggerToRGB(trg_val)
+        logging.warning('START_SOA')
+        logging.flush()
         for frame in range(0, SOA_DUR): # ------------------------------------------------ SOA ONSET
 
-            # send logs and trigger
-            if frame == 0:
-                logging.warning('START_SOA')
-                logging.flush()
+            # send trigger
+            if frame < 2:
                 trig_stim.lineColor = trg_rgb
                 trig_stim.draw()
 
@@ -507,18 +517,19 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         # update trigger value
         trg_val += 10
         trg_rgb = dp.DPxTriggerToRGB(trg_val)
+        logging.warning('START_TAR')
+        logging.flush()
         for frame in range(0, TAR_DUR): # ------------------------------------------------ TAR ONSET
 
-            # send logs and trigger 
-            if frame == 0:
-                logging.warning('START_TAR')
-                logging.flush()
+            # send trigger 
+            if frame < 2:
                 trig_stim.lineColor = trg_rgb
                 trig_stim.draw()
 
             # draw stimuli
             fix_stim.draw()
-            crc_stim.draw()
+            dis_stim.draw()
+            tar_stim.draw()
             win.flip()
 
             # collect user input 
@@ -533,15 +544,15 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         # update trigger value
         trg_val += 10
         trg_rgb = dp.DPxTriggerToRGB(trg_val)
+        logging.warning('START_RES')
+        logging.flush()
         for frame in range(0, RES_DUR): # ------------------------------------------------ RESP CUE ONSET
 
             if early_pressed: # skip response duration if responded during targed presentation
                 break 
 
-            # send logs and trigger
-            if frame == 0:
-                logging.warning('START_RES')
-                logging.flush()
+            # send trigger
+            if frame < 2:
                 trig_stim.lineColor = trg_rgb
                 trig_stim.draw()
             
@@ -612,12 +623,12 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             fdb_dur = FDB_DUR_LNG
         elif acc == 1:
             fdb_dur = FDB_DUR
+        logging.warning('START_FDB')
+        logging.flush()
         for frame in range(0, fdb_dur): # --------------------------------------------------- FDB ONSET
 
-            # send logs and trigger
-            if frame == 0:
-                logging.warning('START_FDB')
-                logging.flush()
+            # send trigger
+            if frame < 2:
                 trig_stim.lineColor = trg_rgb
                 trig_stim.draw()
 
@@ -629,23 +640,25 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         # get string values for stimulus colour and value
         if sub_col_assign_high == 'BLUE':
             if trl_strc[trial][0] == BLUE:
-                stimColour = 'blue'
-                stimVal = 'high'
+                distColour = 'blue'
+                distVal = 'high'
             elif trl_strc[trial][0] == ORANGE:
-                stimColour = 'orange'
-                stimVal = 'low'
+                distColour = 'orange'
+                distVal = 'low'
         elif sub_col_assign_high == 'ORANGE':
             if trl_strc[trial][0] == BLUE:
-                stimColour = 'blue'
-                stimVal = 'low'
+                distColour = 'blue'
+                distVal = 'low'
             elif trl_strc[trial][0] == ORANGE:
-                stimColour = 'orange'
-                stimVal = 'high'
+                distColour = 'orange'
+                distVal = 'high'
         # get string value for  stimulus position
         if trl_strc[trial][2] == LEFT:
-            stimPos = 'left'
+            tarPos = 'left'
+            distPos = 'right'
         elif trl_strc[trial][2] == RIGHT:
-            stimPos = 'right'
+            tarPos = 'right'
+            distPos = 'left'
         
         # calculate reward
         cents_this_trial = points*cents_per_point
@@ -658,12 +671,14 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         exp.addData('Trial', trial + 1)
         exp.addData('RunningTrialNo', runningTrialNo)
         exp.addData('Block', block)
-        exp.addData('StimulusRGB', trl_strc[trial][0])
-        exp.addData('StimulusColour', stimColour)
-        exp.addData('StimulusValue', stimVal)
-        exp.addData('StimulusXY', trl_strc[trial][2])
-        exp.addData('StimulusPosition', stimPos)
-        exp.addData('ResponseRule', trl_strc[trial][1])
+        exp.addData('DistractorRGB', dis_stim.fillColor)
+        exp.addData('DistractorColour', distColour)
+        exp.addData('DistractorValue', distVal)
+        exp.addData('DistractorXY', dis_stim.pos)
+        exp.addData('DistractorPosition', distPos)
+        exp.addData('TargetXY', tar_stim.pos)
+        exp.addData('TargetPosition', tarPos)
+        exp.addData('ResponseRule', cue_stim.text)
         exp.addData('CorrectResponse', cor_response)
         exp.addData('Response', response)
         exp.addData('RT', rt)
@@ -751,14 +766,14 @@ print(f'Dropped frames: {dropped_frames} of {len(frms_all)} ({dropped_frames_pcn
 ## check behavioural performance
 data = pl.read_csv(FILEPATH, sep="\t")
 # check accuracy and response time
-data.filter(
-    (pl.col('RT') <= 1) & (pl.col('RT') >= 0.2)
+(data.filter(
+    (pl.col('RT') <= 1)
     ).groupby(
-    ["ResponseRule", "StimulusValue", 'StimulusPosition']
+    ["ResponseRule", "DistractorValue"]
     ).agg(
     [pl.col('RT').mean().alias('Mean RT'),
     pl.col('Accuracy').mean().alias('Mean Acc')],
-    )
+    ))
 # check points and reward total
 data.select(['Points', 'Cents']).sum()
 reward = np.round(data[-1, 'CumulativeCents']/100, 2)

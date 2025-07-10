@@ -97,8 +97,9 @@ TLC = [-win.size[0]/2, win.size[1]/2] # top left corer
 
 # define colours
 BLUE =   [37, 141, 165]
-ORANGE = [193, 95, 30]  
+ORANGE = [194, 99, 32]  
 WHITE = [255, 255, 255]
+GREY = [119, 119, 119]
 
 # Aassign high and low value to different colours
 if int(expInfo["Subject Number"]) % 2 == 0: # if even, assign high value stimulus to colour blue
@@ -147,10 +148,16 @@ stim_params = { # common parameters used across stimuli
     'contrast': 1,
     'colorSpace': 'rgb255'}
 crc_stim_rad = dva_to_pix(dva=1.5, **size_params)
-crc_stim = visual.Circle(
-    radius = crc_stim_rad,
-    edges = 100,
-    lineWidth = 0,
+dis_stim = visual.Circle(
+    radius=crc_stim_rad,
+    edges=100,
+    lineWidth=0,
+    **stim_params)
+tar_stim = visual.Circle(
+    radius=crc_stim_rad,
+    edges=100,
+    lineWidth=0,
+    fillColor=GREY,
     **stim_params)
 txt_stim_height = dva_to_pix(dva=1, **size_params)
 txt_stim = visual.TextStim(
@@ -161,7 +168,7 @@ txt_stim = visual.TextStim(
     **stim_params)
 fix_stim_height = dva_to_pix(dva=1, **size_params)
 fix_stim = visual.TextStim(
-    text= "+",
+    text="+",
     pos=CENTRE,
     color=WHITE,
     height=fix_stim_height,
@@ -178,8 +185,11 @@ trig_stim = visual.Line(
     end=[TLC[0]+1, TLC[1]],
     interpolate = False,
     **stim_params)
-stims = [crc_stim, txt_stim, fix_stim, cue_stim] # create list of all stimuli to use later 
 
+# create lists of stimulus features to use later 
+cols = [HIGH, LOW]
+pos = [LEFT, RIGHT]
+cue = [CON, INCON]
 # create empty dictionary to save accuracy data
 accDict = {}
 
@@ -188,31 +198,31 @@ instructText = {
 
 'intro_1': '''
     Welcome to our experiment! \n\n\n\
-    On every trial, you will see a letter followed by a coloured circle. \n
-    Depending on the letter and the location of the circle, you will need to press either the "C" or the "M" key. \n\n\n
+    On every trial, you will see a letter followed by a grey circle and a coloured circle presented side by side. \n
+    Depending on the letter and the location of the GREY circle, you will need to press either the "C" or the "M" key. \n\n\n
     Press space to continue. 
     ''',
 
 'intro_2': '''
-    If you see the letter "T", press the response key that is on the SAME side as the circle.\n
-    "T" stands for responding "toward" the circle.\n
-    So, if you see the letter "T", and the circle is on the LEFT side of the screen, you would press the "C" key.\n
-    But if you see the letter "T", and the circle is on the RIGHT side, you would press the "M" key. \n\n\n
+    If you see the letter "T", press the response key that is on the SAME side as the GREY circle.\n
+    "T" stands for responding "toward" the grey circle.\n
+    So, if you see the letter "T", and the grey circle is on the LEFT side of the screen, you would press the "C" key.\n
+    But if you see the letter "T", and the grey circle is on the RIGHT side, you would press the "M" key. \n\n\n
     Press space to continue. 
     ''',
 
 'intro_3': '''
-    If you see the letter "A", press the response key that is on the OPPOSITE side to the circle.\n
-    "A" stands for responding "away" from the circle. \n
-    So, if you see the letter "A", and the circle is on the LEFT side of the screen, you would press the "M" key. \n
-    But if you see the letter "A", and the circle is on the RIGHT side, you would press the "C" key. \n\n\n
+    If you see the letter "A", press the response key that is on the OPPOSITE side to the GREY circle.\n
+    "A" stands for responding "away" from the grey circle. \n
+    So, if you see the letter "A", and the grey circle is on the LEFT side of the screen, you would press the "M" key. \n
+    But if you see the letter "A", and the grey circle is on the RIGHT side, you would press the "C" key. \n\n\n
     Press space to continue. 
     ''',
 
 'intro_4': f'''
-    The circle will be either ORANGE or BLUE. \n
-    If the circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
-    If the circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n\n\n
+    The coloured circle will indicate how many points you can earn on that trial. \n
+    If the coloured circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
+    If the coloured circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n\n\n
     Press space to continue.
     '''
 }
@@ -294,11 +304,12 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
     for trial in range(0, NTRIALS):
         
         # set stimulus properties for this trial 
-        cols = [HIGH, LOW]
-        crc_stim.fillColor = cols[np.random.choice([0,1])]
-        pos = [LEFT, RIGHT]
-        crc_stim.pos = pos[np.random.choice([0, 1])] 
-        cue = [CON, INCON]
+        dis_stim.fillColor = cols[np.random.choice([0,1])]
+        dis_stim.pos = pos[np.random.choice([0, 1])]
+        if np.all(dis_stim.pos == LEFT):
+            tar_stim.pos = RIGHT
+        elif np.all(dis_stim.pos == RIGHT): 
+            tar_stim.pos = LEFT 
         cue_stim.text = cue[np.random.choice([0, 1])]
         ITI_DUR = np.random.randint(ITI_RANGE[0], ITI_RANGE[1])
         
@@ -352,7 +363,8 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
 
             # draw stimuli
             fix_stim.draw()
-            crc_stim.draw()
+            tar_stim.draw()
+            dis_stim.draw()
             win.flip()
 
             # collect user input 
@@ -396,14 +408,14 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         
         # calculate correct response
         if cue_stim.text == CON:
-            if np.all(crc_stim.pos == LEFT):
+            if np.all(tar_stim.pos == LEFT):
                 cor_response = 'c'
-            elif np.all(crc_stim.pos == RIGHT):
+            elif np.all(tar_stim.pos == RIGHT):
                 cor_response = 'm'
         elif cue_stim.text == INCON:
-            if np.all(crc_stim.pos == LEFT):
+            if np.all(tar_stim.pos == LEFT):
                 cor_response = 'm'
-            elif np.all(crc_stim.pos == RIGHT):
+            elif np.all(tar_stim.pos == RIGHT):
                 cor_response = 'c'
 
         # calculate response accuracy and points if a response is  made
@@ -420,9 +432,9 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
                 elif pressed: 
                     txt_stim.text = 'Incorrect! \n No points.'
             elif acc == 1:
-                if np.all(crc_stim.fillColor == HIGH): # high value reward
+                if np.all(dis_stim.fillColor == HIGH): # high value reward
                     points = POINTS_HIGH
-                elif np.all(crc_stim.fillColor == LOW): # low value reward
+                elif np.all(dis_stim.fillColor == LOW): # low value reward
                     points = POINTS_LOW
                 txt_stim.text = f'+ {points} points!'
         # if no response made, assign missing values etc.     
