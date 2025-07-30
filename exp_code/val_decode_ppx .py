@@ -144,24 +144,42 @@ NTRIALS = 72
 NBLOCKS = 20
 NBLOCKSREWARD = 12
 
-# define points
+# define points boost
 POINTS_HIGH = 50
 POINTS_LOW = 5
 
+# define function to convert RT into points
+min_rt = 0.2
+max_rt = 1
+def points_function(rt):
+
+    if rt <= min_rt:
+        coef = 10
+    elif (rt > min_rt) & (rt <= max_rt):
+        coef = (1 - (rt - 0.2)*1.25) * 10
+    elif rt > max_rt:
+        coef = 0
+
+    if coef < 0:
+        coef = 0
+
+    return coef
+
 # calculate total possible points
-total_points = ((NBLOCKSREWARD*NTRIALS/2*POINTS_HIGH) + # 12 blocks with half of trials == high reward
-                (NBLOCKSREWARD*NTRIALS/2*POINTS_LOW) + # 12 blocks with half of trials == low reward
-                ((NBLOCKS-NBLOCKSREWARD)*NTRIALS*POINTS_LOW)) # 8 blocks with all trials == low reward
+max_total_points = ((NBLOCKSREWARD*(NTRIALS/2)*(POINTS_HIGH*points_function(min_rt))) + # 12 blocks with half of trials == high reward
+                    (NBLOCKSREWARD*(NTRIALS/2)*(POINTS_LOW*points_function(min_rt))) + # 12 blocks with half of trials == low reward
+                    ((NBLOCKS-NBLOCKSREWARD)*NTRIALS*(POINTS_LOW*points_function(min_rt)))) # 8 blocks with all trials == low reward
+
 total_reward = 1500 # $15, or 1500 cents
-cents_per_point = total_reward / total_points
+cents_per_point = total_reward / max_total_points
 
 # define timing (multiply all by 4 to account for increase in refrate from PROPixx)
 ITI_RANGE = [int(0.8*REFRATE), int(1*REFRATE)] 
 CUE_DUR = int(0.3*REFRATE)
 SOA_DUR = int(0.2*REFRATE)
-TAR_DUR = int(0.2*REFRATE)
-RES_DUR = int(1*REFRATE)
-FDB_DUR = int(0.5*REFRATE)
+TAR_DUR = int(1*REFRATE)
+# RES_DUR = int(1*REFRATE)
+FDB_DUR = int(0.6*REFRATE)
 FDB_DUR_LNG = int(1.5*REFRATE)
 
 # create stimuli
@@ -250,16 +268,18 @@ instructText = {
     ''',
 
 'INSTRUCTIONS_4': f'''
-    The coloured circle will indicate how many points you can earn on that trial. \n
-    If the coloured circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
-    If the coloured circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n
+    The faster you respond, the more points you can earn! You can earn up to 10 points per trial based on your response speed. \n
+    However, if you make a mistake you won't earn any points on that trial, so you need to be accurate too. \n
+    The coloured circle will indicate the POINTS BOOST for that trial. \n
+    If the coloured circle is {sub_col_assign_high}, your points will be multiplied by {POINTS_HIGH}. \n
+    If the coloured circle is {sub_col_assign_low}, your points will be multiplied by {POINTS_LOW}. \n
     These points will be converted into additional reimbursement at the end of the experiment. \n\n\n
     Press space to continue.
     '''
 } 
 
 extinction = f'''
-    From now on, all correct responses will earn you {POINTS_LOW} points. \n\n\n 
+    From now on, the POINTS BOOST for both coloured circles will be {POINTS_LOW}x. \n\n\n 
     Please keep your eyes on the fixation cross throughout each trial. \n\n\n
     Press space to begin Block {NBLOCKSREWARD + 1}.
     '''
@@ -303,9 +323,8 @@ ITI: x00 # inter-trial interval onset
 CUE: x10 # rule cue onsest
 SOA: x20 # stim-onset asynchrony onset
 TAR: x30 # target onset
-RSC: x40 # response cue onset
-RES: x50 # correct response
-RES: x60 # incorrect response
+RES: x40 # correct response
+RES: x50 # incorrect response
 RES: x90 # missed response
 '''
 
@@ -532,34 +551,6 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             tar_stim.draw()
             win.flip()
 
-            # collect user input 
-            early_pressed = event.getKeys(keyList = RESPKEYS, timeStamped = clock)
-            if early_pressed:
-                logging.warning('RESPONSE')
-                logging.flush()
-                response = early_pressed[0][0]
-                rt = early_pressed[0][1]
-                break
-
-        # update trigger value
-        trg_val += 10
-        trg_rgb = dp.DPxTriggerToRGB(trg_val)
-        logging.warning('START_RES')
-        logging.flush()
-        for frame in range(0, RES_DUR): # ------------------------------------------------ RESP CUE ONSET
-
-            if early_pressed: # skip response duration if responded during targed presentation
-                break 
-
-            # send trigger
-            if frame < 2:
-                trig_stim.lineColor = trg_rgb
-                trig_stim.draw()
-            
-            # draw fixation
-            fix_stim.draw()
-            win.flip()
-
             # collect response input
             quitPressed = event.getKeys(keyList = QUITKEYS)
             pressed = event.getKeys(keyList = RESPKEYS, timeStamped = clock)
@@ -586,7 +577,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
                 cor_response = 'c'
 
         # calculate response accuracy and points if a response is made
-        if (pressed) or (early_pressed):  
+        if pressed:  
             if cor_response == response:
                 acc = 1
             elif cor_response != response:
@@ -595,27 +586,27 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             if acc == 0:
                 points = 0
                 trg_val += 20
-                if early_pressed:
+                if rt < min_rt:
                     txt_stim.text = 'Incorrect! \n No points. \n Slow down!'
-                elif pressed: 
+                else: 
                     txt_stim.text = 'Incorrect! \n No points.'
             elif acc == 1:
                 if block <= NBLOCKSREWARD:
                     if trl_strc[trial][0] == HIGH: # high value reward
-                        points = POINTS_HIGH
+                        points = np.floor(points_function(rt)*POINTS_HIGH).astype(int)
                     elif trl_strc[trial][0] == LOW: # low value reward
-                        points = POINTS_LOW
+                        points = np.floor(points_function(rt)*POINTS_LOW).astype(int)
                 elif block > NBLOCKSREWARD:
-                    points = POINTS_LOW
+                    points = np.floor(points_function(rt)*POINTS_LOW).astype(int)
                 txt_stim.text = f'+ {points} points!'
                 trg_val += 10   
         # if no response made, assign missing values etc.     
-        elif (not pressed) & (not early_pressed):
+        elif not pressed:
             response = 999
             rt = 999
             acc = 999
             points = 0
-            trg_val += 50
+            trg_val += 60
             txt_stim.text = 'Too slow! No points.'
         
         trg_rgb = dp.DPxTriggerToRGB(trg_val)

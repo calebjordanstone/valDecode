@@ -6,7 +6,7 @@ import numpy as np
 import os
 import itertools
 import json
-from pypixxlib import _libdpx as dp
+# from pypixxlib import _libdpx as dp
 logging.console.setLevel(logging.WARNING)
 ## ======================================================================
 ## Get experiment and monitor information 
@@ -122,22 +122,40 @@ RESPKEYS = ['c', 'm']
 QUITKEYS = ['escape']
 CONKEYS = ['space']
 
-# define points
-POINTS_HIGH = 50
-POINTS_LOW = 5
-
 # define number of trials/blocks
 NTRIALS = 10
 NBLOCKS = 10
+
+# define points boost
+POINTS_HIGH = 50
+POINTS_LOW = 5
+
+# define function to convert RT into points
+min_rt = 0.2
+max_rt = 1
+def points_function(rt):
+
+    if rt <= min_rt:
+        coef = 10
+    elif (rt > min_rt) & (rt <= max_rt):
+        coef = (1 - (rt - 0.2)*1.25) * 10
+    elif rt > max_rt:
+        coef = 0
+
+    if coef < 0:
+        coef = 0
+
+    return coef
 
 # define timing (multiply all by 4 to account for increase in refrate from PROPixx)
 ITI_RANGE = [int(0.8*REFRATE), int(1*REFRATE)] 
 CUE_DUR = int(0.3*REFRATE)
 SOA_DUR = int(0.2*REFRATE)
-TAR_DUR = int(0.2*REFRATE)
-RES_DUR = int(1*REFRATE)
-RES_DUR_LNG = int(5*REFRATE)
-FDB_DUR = int(0.5*REFRATE)
+TAR_DUR = int(1*REFRATE)
+TAR_DUR_LNG = int(5*REFRATE)
+# RES_DUR = int(1*REFRATE)
+# RES_DUR_LNG = int(5*REFRATE)
+FDB_DUR = int(0.6*REFRATE)
 FDB_DUR_LNG = int(1.5*REFRATE)
 
 # create stimuli
@@ -220,9 +238,11 @@ instructText = {
     ''',
 
 'intro_4': f'''
-    The coloured circle will indicate how many points you can earn on that trial. \n
-    If the coloured circle is {sub_col_assign_high}, you can earn {POINTS_HIGH} points for a correct response. \n
-    If the coloured circle is {sub_col_assign_low}, you can earn {POINTS_LOW} points for a correct response. \n\n\n
+    The faster you respond, the more points you can earn! You can earn up to 10 points per trial based on your response speed. \n
+    However, if you make a mistake you won't earn any points on that trial, so you need to be accurate too. \n
+    The coloured circle will indicate the POINTS BOOST for that trial. \n
+    If the coloured circle is {sub_col_assign_high}, your points will be multiplied by {POINTS_HIGH}. \n
+    If the coloured circle is {sub_col_assign_low}, your points will be multiplied by {POINTS_LOW}. \n
     Press space to continue.
     '''
 }
@@ -230,16 +250,16 @@ instructText = {
 ## Initialise PROPixx, adjust stimulus parameters, define triggers
 ## ======================================================================
 # establish connection to hardware
-dp.DPxOpen()
-isReady = dp.DPxIsReady()
-if isReady:
-    dp.DPxSetPPxDlpSeqPgrm('RGB')
-    dp.DPxEnableDoutPixelMode() # enable pixel mode for triggers
-    dp.DPxEnablePPxRearProjection() # enable rear projection to reverse display
-    dp.DPxWriteRegCache()
-else:
-    print('Warning! DPx call failed, check connection to hardware')
-    core.quit()
+# dp.DPxOpen()
+# isReady = dp.DPxIsReady()
+# if isReady:
+#     dp.DPxSetPPxDlpSeqPgrm('RGB')
+#     dp.DPxEnableDoutPixelMode() # enable pixel mode for triggers
+#     dp.DPxEnablePPxRearProjection() # enable rear projection to reverse display
+#     dp.DPxWriteRegCache()
+# else:
+#     print('Warning! DPx call failed, check connection to hardware')
+#     core.quit()
 
 ## ======================================================================
 ## Present stimuli
@@ -355,7 +375,11 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
         # reset things before target display
         event.clearEvents()
         clock.reset()
-        for frame in range(0, TAR_DUR): # ------------------------------------------------ TAR ONSET
+        if block == 1: 
+            tar_dur = TAR_DUR_LNG # extend the deadline on the first block
+        else: 
+            tar_dur = TAR_DUR
+        for frame in range(0, tar_dur): # ------------------------------------------------ TAR ONSET
 
             if frame == 0:
                 logging.warning('START_TAR')
@@ -367,37 +391,11 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             dis_stim.draw()
             win.flip()
 
-            # collect user input 
-            early_pressed = event.getKeys(keyList = RESPKEYS, timeStamped = clock)
-            if early_pressed:
-                logging.warning('RESPONSE')
-                logging.flush()
-                response = early_pressed[0][0]
-                rt = early_pressed[0][1]
-                break
-
-        if block == 1: 
-            res_dur = RES_DUR_LNG # extend the deadline on the first block
-        else: 
-            res_dur = RES_DUR
-        for frame in range(0, res_dur): # ------------------------------------------------ RESP CUE ONSET
-
-            if early_pressed: # skip response duration if responded during targed presentation
-                break 
-
-            if frame == 0:
-                logging.warning('START_RES')
-                logging.flush()
-
-            # draw fixation
-            fix_stim.draw()
-            win.flip()
-
             # collect response input
             quitPressed = event.getKeys(keyList = QUITKEYS)
             pressed = event.getKeys(keyList = RESPKEYS, timeStamped = clock)
-            if quitPressed: # exit task
-                dp.DPxClose() 
+            if quitPressed: # exit task 
+                # dp.DPxClose() 
                 core.quit()
             elif pressed:
                 logging.warning('RESPONSE')
@@ -405,7 +403,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
                 response = pressed[0][0]
                 rt = pressed[0][1]
                 break
-        
+
         # calculate correct response
         if cue_stim.text == CON:
             if np.all(tar_stim.pos == LEFT):
@@ -419,7 +417,7 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
                 cor_response = 'c'
 
         # calculate response accuracy and points if a response is  made
-        if (pressed) or (early_pressed):  
+        if pressed:  
             if cor_response == response:
                 acc = 1
             elif cor_response != response:
@@ -427,18 +425,18 @@ for block in range(1, NBLOCKS + 1): #-------------------------------------------
             # update points, tiggers, and feedback display 
             if acc == 0:
                 points = 0
-                if early_pressed:
+                if rt < min_rt:
                     txt_stim.text = 'Incorrect! \n No points. \n Slow down!'
-                elif pressed: 
+                else:
                     txt_stim.text = 'Incorrect! \n No points.'
             elif acc == 1:
                 if np.all(dis_stim.fillColor == HIGH): # high value reward
-                    points = POINTS_HIGH
+                    points = np.floor(points_function(rt)*POINTS_HIGH).astype(int)
                 elif np.all(dis_stim.fillColor == LOW): # low value reward
-                    points = POINTS_LOW
+                    points = np.floor(points_function(rt)*POINTS_LOW).astype(int)
                 txt_stim.text = f'+ {points} points!'
         # if no response made, assign missing values etc.     
-        elif (not pressed) & (not early_pressed):
+        elif not pressed:
             response = 999
             rt = 999
             acc = np.nan
@@ -516,10 +514,10 @@ for block in accDict.keys():
 print(f'Mean accuracy overall: {np.mean(mean_acc)}%')
 
 # close everything down
-dp.DPxSetPPxDlpSeqPgrm('RGB')
-dp.DPxDisableDoutPixelMode()
-dp.DPxWriteRegCache()
-dp.DPxClose()
+# dp.DPxSetPPxDlpSeqPgrm('RGB')
+# dp.DPxDisableDoutPixelMode()
+# dp.DPxWriteRegCache()
+# dp.DPxClose()
 win.close()
 core.quit()
 
