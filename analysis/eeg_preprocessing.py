@@ -19,7 +19,7 @@ srcDataEEG = sorted(Path(DATAPATH).glob('**/*.bdf'))
 srcDataBeh = sorted(Path(DATAPATH).glob('**/*beh.txt'))
 srcDataFrms = sorted(Path(DATAPATH).glob('**/*frms.txt'))
 
-for path in srcDataEEG[2:3]:
+for path in srcDataEEG[4:5]:
 
     # extract some BIDS info
     subID, task, modality = path.stem.split('_')

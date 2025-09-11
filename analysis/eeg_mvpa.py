@@ -19,7 +19,7 @@ from eeg_fasterAlgorithm import *
 DATAPATH = "C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/data/" 
 EPOCHPATH = 'C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/preprocessed_data/'
 SAVEPATH = 'C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/output/'
-extension = 'cue_rc' # change extension to get epochs with different preprocessing stages
+extension = 'cue_rc_avg' # change extension to get epochs with different preprocessing stages
 epoch_paths = sorted(Path(EPOCHPATH).glob(f'sub*/*{extension}.fif')) 
 epoch_counts = pl.read_csv(EPOCHPATH + f'epochs_{extension}.txt')
 
@@ -49,7 +49,7 @@ cols = ["dfun_110",
         "dfun_810"]
 
 # loop through participants
-for path in epoch_paths[1:2]:
+for path in epoch_paths[0:1]:
 
     # load data
     subID = path.stem.split('_')[0]
@@ -273,4 +273,4 @@ for path in epoch_paths[1:2]:
 # fig.legend(loc=[0.25, 0.6])
 
 
-
+dat = pl.read_csv(SAVEPATH + f'dfun_cue_rc_avg_sub-01.csv')
