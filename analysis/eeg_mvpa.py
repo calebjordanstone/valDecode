@@ -9,7 +9,7 @@ import scipy as sp
 import sklearn as sk
 import seaborn as sb
 import matplotlib.pyplot as plt
-from mne.decoding import SlidingEstimator, cross_val_multiscore
+from mne.decoding import SlidingEstimator, cross_val_multiscore, GeneralizingEstimator
 from sklearn import svm, model_selection
 from pathlib import Path
 from eeg_fasterAlgorithm import *
@@ -34,8 +34,9 @@ alpha = (freqs >= 8) & (freqs < 13)
 beta = (freqs >= 13) & (freqs < 30)
 gamma = freqs >= 30
 # create classifier
-svc = svm.LinearSVC(class_weight='balanced', max_iter=2000)
+svc = svm.LinearSVC(class_weight='balanced', max_iter=2000) # set dual = false to help with convergence?? 
 temp_decode = SlidingEstimator(svc, scoring="balanced_accuracy") # extend pipeline over time
+temp_gen = GeneralizingEstimator(svc, scoring="balanced_accuracy")
 skf = model_selection.StratifiedKFold(n_splits=4, shuffle=True) # define cross-validation
 
 # create column names
@@ -48,8 +49,13 @@ cols = ["dfun_110",
         "dfun_710",
         "dfun_810"]
 
+cols_val = ["dfun_tl", 
+            "dfun_tr", 
+            "dfun_al", 
+            "dfun_ar"]
+
 # loop through participants
-for path in epoch_paths[0:1]:
+for path in epoch_paths[7:8]:
 
     # load data
     subID = path.stem.split('_')[0]
@@ -65,7 +71,7 @@ for path in epoch_paths[0:1]:
     # average over frequency bands
     power_data = power.get_data() 
     times = (power.times >= analysis_window[0]) & (power.times <= analysis_window[1])
-    power_data = power_data[:, :, :, times] # trim data to times of interest
+    power_data = power_data[..., times] # trim data to times of interest
     power_ind_freqs = [power_data[:, :, band, :].mean(2) 
                         for band in [delta, theta, alpha, beta, gamma]] # average over all freqncies within a band
     
@@ -75,11 +81,57 @@ for path in epoch_paths[0:1]:
         z_scrd = [sp.stats.zscore(band[:, :, t], axis=1) 
                     for t in range(0, band.shape[2])] # z-score across electodes for each epoch and time point, separately for each freqency band
         z_scrd_lst.append(np.moveaxis(np.array(z_scrd), 0, -1))
+    
+    # get data
     X = np.concatenate(z_scrd_lst, axis=1)
-
     # reset indicies of class comparisons for pre-trial period
     power.selection = np.arange(0, len(power)) 
+    # get indicies of classes
+    y = power.events[:, 2]
     
+    ## Run multiclass decoding by value ----------------------------------------------
+    # create empty data frame to save results
+    df_decfun = pl.DataFrame(schema={"dfun_tl": float, # 110/510
+                                     "dfun_tr": float, # 210/610
+                                     "dfun_al": float, # 310/710
+                                     "dfun_ar": float, # 410/810
+                                     "y": int,
+                                     "tpoint":int,
+                                     "score":float,
+                                     "value":str,
+                                     "subID":str})
+    
+    for val in ['hi', 'lo']:
+        # get indices for value condition
+        idx = power[val].selection
+
+        # get subsets of X and y
+        X_val = X[idx]
+        y_val = y[idx]
+
+        # run cross-validation
+        splits = list(skf.split(X_val, y_val))
+        for train, test in splits:
+
+            for t in range(X_val.shape[-1]):
+                
+                svc.fit(X_val[:, :, t][train], y_val[train])
+                score = svc.score(X_val[:, :, t][test], y_val[test])
+                dfun = svc.decision_function(X_val[:, :, t][test])
+
+                df = pl.DataFrame(dfun, schema=cols_val)
+                df = df.with_columns([(pl.Series(y[test], dtype=int).alias('y')),
+                                      (pl.lit(t, dtype=int).alias('tpoint')),
+                                      (pl.lit(score, dtype=float).alias('score')),
+                                      (pl.lit(val, dtype=str).alias('value')),
+                                      (pl.lit(subID, dtype=str).alias('subID'))])
+                
+                # save output to main dataframe
+                df_decfun = pl.concat([df_decfun, df])
+
+    # save csv 
+    df_decfun.write_csv(SAVEPATH + f'dfun_by_val_{extension}_{subID}.csv')
+
     ## Run multiclass decoding -------------------------------------------------------
     # create empty data frame to save results
     df_decfun = pl.DataFrame(schema={"dfun_110": float, 
@@ -95,9 +147,6 @@ for path in epoch_paths[0:1]:
                                      "score":float,
                                      "subID":str})
     
-    # get indicies of classes
-    y = power.events[:, 2]
-
     # run model
     splits = list(skf.split(X, y))
     for train, test in splits:
@@ -107,7 +156,7 @@ for path in epoch_paths[0:1]:
             svc.fit(X[:, :, t][train], y[train])
             score = svc.score(X[:, :, t][test], y[test])
             #preds = svc.predict(X[:, :, t][test])
-            dfun = svc.decision_function(X[:, :, t][test])
+            dfun = svc.decision_function(X[:, :, t][test]) # note: returns array in order of class labels (i.e., 110, 210, 310, etc)
 
             df = pl.DataFrame(dfun, schema=cols)
             df = df.with_columns([(pl.Series(y[test], dtype=int).alias('y')),
