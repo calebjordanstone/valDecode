@@ -8,6 +8,7 @@ library(ggpubr)
 library(ggthemes)
 library(cowplot)
 library(lme4)
+library(car)
 
 # set data paths
 path_exp <- "C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/"
@@ -18,7 +19,7 @@ path_data <- paste0(path_exp, 'data/')
 files_beh <- list.files(path_data, pattern = '.*(beh.txt)', recursive = T)
 # data_beh <- fread(file.path(path_data, files_beh[1]), stringsAsFactors = T)
 data_beh <- rbindlist(lapply(file.path(path_data, files_beh), fread))
-files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_avg')
+files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_avg') ################ Cue-locked, reward-contingency blocks - change here for different epochs
 # data_dfun <- fread(file.path(path_out, files_dfun[1]), stringsAsFactors = T)
 data_dfun <- rbindlist(lapply(file.path(path_out, files_dfun), fread))
 # files_dfun_by_val <- list.files(path_out, pattern = 'dfun_by_val_cue_rc_avg')
@@ -28,15 +29,25 @@ n_tpoints = 282 # epochs are from -0.1 s to 1 s relative to cue onset
 ts <- seq(-0.1, 1, length.out=n_tpoints) # put time samples into actual times
 
 # define model RDMs
-vec_stim <- c(1, 0, 1, 0, 1, 0, 1, 0,
-              0, 1, 0, 1, 0, 1, 0, 1,
-              1, 0, 1, 0, 1, 0, 1, 0,
-              0, 1, 0, 1, 0, 1, 0, 1,
-              1, 0, 1, 0, 1, 0, 1, 0,
-              0, 1, 0, 1, 0, 1, 0, 1,
-              1, 0, 1, 0, 1, 0, 1, 0,
-              0, 1, 0, 1, 0, 1, 0, 1)
+# Trig codes: 1, 2, 3, 4, 5, 6, 7, 8  
+vec_stim <- c(1, 0, 1, 0, 1, 0, 1, 0, # 110 - high value, rule toward, target left
+              0, 1, 0, 1, 0, 1, 0, 1, # 210 - high, toward, right
+              1, 0, 1, 0, 1, 0, 1, 0, # 310 - high, away, left
+              0, 1, 0, 1, 0, 1, 0, 1, # 410 - high, away, right
+              1, 0, 1, 0, 1, 0, 1, 0, # 510 - low, toward, left
+              0, 1, 0, 1, 0, 1, 0, 1, # 610 - low, toward, right
+              1, 0, 1, 0, 1, 0, 1, 0, # 710 - low, away, left
+              0, 1, 0, 1, 0, 1, 0, 1) # 810 - low, away, right
 mat_stim <- matrix(vec_stim, 8)
+vec_stim_by_val <- c(1, 0, 1, 0, 0, 1, 0, 1,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     1, 0, 1, 0, 0, 1, 0, 1,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     1, 0, 1, 0, 0, 1, 0, 1,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     1, 0, 1, 0, 0, 1, 0, 1)
+mat_stim_by_val <- matrix(vec_stim_by_val, 8)
 vec_resp <- c(1, 0, 0, 1, 1, 0, 0, 1,
               0, 1, 1, 0, 0, 1, 1, 0,
               0, 1, 1, 0, 0, 1, 1, 0,
@@ -46,15 +57,33 @@ vec_resp <- c(1, 0, 0, 1, 1, 0, 0, 1,
               0, 1, 1, 0, 0, 1, 1, 0,
               1, 0, 0, 1, 1, 0, 0, 1)
 mat_resp <- matrix(vec_resp, 8, 8)
-vec_resp_alt <- c(1, 0, 0, 1, 1, 0, 1, 0,
-                  0, 1, 1, 0, 0, 1, 0, 1,
-                  0, 1, 1, 0, 0, 1, 0, 1,
-                  1, 0, 0, 1, 1, 0, 1, 0,
-                  1, 0, 0, 1, 1, 0, 1, 0,
-                  0, 1, 1, 0, 0, 1, 0, 1,
-                  1, 0, 0, 1, 1, 0, 1, 0,
-                  0, 1, 1, 0, 0, 1, 0, 1)
-mat_resp_alt <- matrix(vec_resp_alt, 8, 8) ## This should be positively correlated with VMAC effect (rt_high-rt_low) on "toward" trials, but negatively correlated on "away" trials. The inverse pattern should be seen on the normal resp vector
+vec_resp_by_val <- c(1, 0, 1, 0, 0, 1, 1, 0,
+                     0, 1, 0, 1, 1, 0, 0, 1,
+                     1, 0, 1, 0, 0, 1, 1, 0,
+                     0, 1, 0, 1, 1, 0, 0, 1,
+                     0, 1, 0, 1, 1, 0, 0, 1,
+                     1, 0, 1, 0, 0, 1, 1, 0,
+                     1, 0, 1, 0, 0, 1, 1, 0,
+                     0, 1, 0, 1, 1, 0, 0, 1)
+mat_resp_by_val <- matrix(vec_resp_by_val, 8, 8, byrow=T) 
+vec_resp_by_val2 <- c(1, 0, 0, 1, 0, 1, 0, 1,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      1, 0, 0, 1, 0, 1, 0, 1,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      1, 0, 0, 1, 0, 1, 0, 1,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      1, 0, 0, 1, 0, 1, 0, 1)
+mat_resp_by_val2 <- matrix(vec_resp_by_val2, 8, 8, byrow=T)
+vec_resp_by_val3 <- c(1, 0, 1, 0, 1, 0, 0, 1,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      1, 0, 1, 0, 1, 0, 0, 1,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      1, 0, 1, 0, 1, 0, 0, 1,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      1, 0, 1, 0, 1, 0, 0, 1)
+mat_resp_by_val3 <- matrix(vec_resp_by_val3, 8, 8, byrow=T)
 vec_rule <- c(1, 1, 0, 0, 1, 1, 0, 0,
               1, 1, 0, 0, 1, 1, 0, 0,
               0, 0, 1, 1, 0, 0, 1, 1,
@@ -64,15 +93,15 @@ vec_rule <- c(1, 1, 0, 0, 1, 1, 0, 0,
               0, 0, 1, 1, 0, 0, 1, 1,
               0, 0, 1, 1, 0, 0, 1, 1)
 mat_rule <- matrix(vec_rule, 8, 8)
-vec_rule_alt <- c(1, 1, 0, 0, 1, 1, 1, 1,
-                  1, 1, 0, 0, 1, 1, 1, 1,
-                  0, 0, 1, 1, 0, 0, 0, 0,
-                  0, 0, 1, 1, 0, 0, 0, 0,
-                  1, 1, 0, 0, 1, 1, 1, 1,
-                  1, 1, 0, 0, 1, 1, 1, 1,
-                  1, 1, 0, 0, 1, 1, 1, 1,
-                  1, 1, 0, 0, 1, 1, 1, 1)
-mat_rule_alt <- matrix(vec_rule_alt, 8, 8)
+vec_rule_by_val <- c(1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     0, 0, 0, 0, 1, 1, 0, 0,
+                     0, 0, 0, 0, 1, 1, 0, 0,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1)
+mat_rule_by_val <- matrix(vec_rule_by_val, 8, 8, byrow=T) 
 vec_val <- c(1, 1, 1, 1, 0, 0, 0, 0,
              1, 1, 1, 1, 0, 0, 0, 0,
              1, 1, 1, 1, 0, 0, 0, 0,
@@ -82,12 +111,13 @@ vec_val <- c(1, 1, 1, 1, 0, 0, 0, 0,
              0, 0, 0, 0, 1, 1, 1, 1,
              0, 0, 0, 0, 1, 1, 1, 1)
 mat_val <-matrix(vec_val, 8)
-mat_conj <- diag(1, 8, 8)
+# mat_conj <- diag(1, 8, 8)
 
-# Run analysis per subject and save reslts
+# Run analysis per subject and save results
 rslts_all <- data.table()
 rslts_by_val <- data.table()
 rslts_int <- data.table()
+rslts_beh <- data.table()
 for (sub in unique(data_dfun[, subID])) {
   
   # update progress 
@@ -95,15 +125,17 @@ for (sub in unique(data_dfun[, subID])) {
   
   ## Wrangling data ##
   # get condition RTs
-  data_beh_sub <- data_beh[Subject == sub]
-  data_beh_sub <- data_beh_sub[Accuracy == 1 & Block < 13
-  ][, zRT := scale(RT)]
+  data_beh_sub <- data_beh[Subject == sub & Accuracy == 1 & Block < 13] ######## Reward contingency blocks
   data_beh_sub_av <- data_beh_sub[, 
-    # (Accuracy == 1) & (Block < 13), 
-    .(ZMeanRT=mean(zRT)),
-    by = .(DistractorValue, ResponseRule, TargetPosition)
-    ][order(DistractorValue, -ResponseRule, TargetPosition)]
-  data_beh_sub_av[, y := as.integer(paste0(seq(1, 8), '10'))]
+                                  .(MeanRT=mean(RT)),
+                                  by = .(DistractorValue, ResponseRule)
+                                  ][order(ResponseRule, DistractorValue)]
+  rslts_beh_sub <- data.table(
+    subID = sub,
+    vmac_away = data_beh_sub_av[1, MeanRT] - data_beh_sub_av[2, MeanRT], # high minus low
+    vmac_toward = data_beh_sub_av[3, MeanRT] - data_beh_sub_av[4, MeanRT] # high minus low
+  )
+  rslts_beh <- rbind(rslts_beh, rslts_beh_sub)
   
   # put data_dfun into long format
   data_dfun_sub <- data_dfun[subID == sub,]
@@ -122,11 +154,11 @@ for (sub in unique(data_dfun[, subID])) {
   # add in RDMs vectors for each trial type
   data_dfun_long[, ':=' 
       (stim = case_when(
-        unique(y) %in% c(110, 310, 510, 710) ~ mat_stim[, 1],
+        unique(y) %in% c(110, 310, 510, 710) ~ mat_stim[, 1], 
         T ~ mat_stim[, 2]),
        resp = case_when(
         unique(y) %in% c(110, 410, 510, 810) ~ mat_resp[, 1],
-        T ~ mat_resp[, 2]),
+        T ~ mat_resp[, 7]),
        rule = case_when(
         unique(y) %in% c(110, 210, 510, 610) ~ mat_rule[, 1],
         T ~ mat_rule[, 3]),
@@ -136,57 +168,24 @@ for (sub in unique(data_dfun[, subID])) {
        conj = case_when(
         y == class ~ 1,
         T ~ 0),
-       resp_alt = case_when(
-        unique(y) %in% c(110, 410, 510, 710) ~ mat_resp_alt[, 1],
-        T ~ mat_resp_alt[, 2]), 
-       rule_alt = case_when(
-        unique(y) %in% c(310, 410) ~ mat_rule_alt[, 3],
-        T ~ mat_rule_alt[, 1])), 
+       stim_by_val = case_when(
+        unique(y) %in% c(110, 310, 610, 810) ~ mat_stim_by_val[, 1],
+        T ~ mat_stim_by_val[, 2]),
+       resp_by_val = case_when(
+        unique(y) %in% c(110, 310, 610, 710) ~ mat_resp_by_val[, 1],
+        T ~ mat_resp_by_val[, 2]), 
+       resp_by_val2 = case_when(
+        unique(y) %in% c(110, 410, 610, 810) ~ mat_resp_by_val2[, 1],
+        T ~ mat_resp_by_val2[, 2]),
+       resp_by_val3 = case_when(
+          unique(y) %in% c(110, 310, 510, 810) ~ mat_resp_by_val3[, 1],
+          T ~ mat_resp_by_val3[, 2]),
+       rule_by_val = case_when(
+        unique(y) %in% c(510, 610) ~ mat_rule_by_val[, 5],
+        T ~ mat_rule_by_val[, 1])), 
       by = trial_by_tpoint]
   
   # add in RT nuisance vector
-  data_dfun_long <- data_dfun_long[data_beh_sub_av[, .(ZMeanRT, y)], on='y']
-  
-  # # put data_dfun_by_val into long format
-  # data_dfun_by_val_sub <- data_dfun_by_val[subID == sub,]
-  # data_dfun_by_val_long <- transpose(data_dfun_by_val_sub[, dfun_tl:dfun_ar, ])
-  # data_dfun_by_val_long[, class := c('tl', 'tr', 'al', 'ar')]
-  # data_dfun_by_val_long <- melt(data_dfun_by_val_long, id.vars='class', 
-  #                               variable.name='trial_by_tpoint', 
-  #                               value.name='dfun')
-  # data_dfun_by_val_ids = data.table( # create data table of ID variables
-  #   y = rep(data_dfun_by_val_sub[, y], each=8),
-  #   tpoint = rep(data_dfun_by_val_sub[, tpoint], each=8),
-  #   subID = rep(data_dfun_by_val_sub[, subID], each=8)) 
-  # data_dfun_long <- cbind(data_dfun_ids, data_dfun_long) # add ID variables back to data
-  # setorder(data_dfun_long, y, tpoint, trial_by_tpoint, class) # make sure things are ordered correctly
-  # 
-  # # add in RDMs vectors for each trial type
-  # data_dfun_long[, ':=' 
-  #                (stim = case_when(
-  #                  unique(y) %in% c(110, 310, 510, 710) ~ mat_stim[, 1],
-  #                  T ~ mat_stim[, 2]),
-  #                  resp = case_when(
-  #                    unique(y) %in% c(110, 410, 510, 810) ~ mat_resp[, 1],
-  #                    T ~ mat_resp[, 2]),
-  #                  rule = case_when(
-  #                    unique(y) %in% c(110, 210, 510, 610) ~ mat_rule[, 1],
-  #                    T ~ mat_rule[, 3]),
-  #                  val = case_when(
-  #                    unique(y) %in% c(110, 210, 310, 410) ~ mat_val[, 1],
-  #                    T ~ mat_val[, 5]),
-  #                  conj = case_when(
-  #                    y == class ~ 1,
-  #                    T ~ 0),
-  #                  resp_alt = case_when(
-  #                    unique(y) %in% c(110, 410, 510, 710) ~ mat_resp_alt[, 1],
-  #                    T ~ mat_resp_alt[, 2]), 
-  #                  rule_alt = case_when(
-  #                    unique(y) %in% c(310, 410) ~ mat_rule_alt[, 3],
-  #                    T ~ mat_rule_alt[, 1])), 
-  #                by = trial_by_tpoint]
-  # 
-  # # add in RT nuisance vector
   # data_dfun_long <- data_dfun_long[data_beh_sub_av[, .(ZMeanRT, y)], on='y']
   
   ## Running analysis ## 
@@ -197,16 +196,9 @@ for (sub in unique(data_dfun[, subID])) {
     # subset data per time point
     data_dfun_t <- data_dfun_long[tpoint == t, ]
     
-    # average over trials??
-    # t_dat <- t_dat[, .(dfun=mean(dfun)), by=.(class, y)]
-    # t_dat$stim <- stim_vec
-    # t_dat$resp <- resp_vec
-    # t_dat$rule <- rule_vec
-    # t_dat$val <- val_vec
-    
     # compute model
     # mdl <- lm(dfun ~ stim + resp + rule + val, data = t_dat)
-    mdl_t <- lsfit(x=data_dfun_t[, .(stim, resp, rule, val, conj, ZMeanRT)], 
+    mdl_t <- lsfit(x=data_dfun_t[, .(stim, resp, rule, val, conj)], 
                    y=data_dfun_t[, dfun])
     
     # add betas to data table
@@ -218,8 +210,7 @@ for (sub in unique(data_dfun[, subID])) {
       resp = mdl_t$coefficients['resp'],
       rule = mdl_t$coefficients['rule'],
       val = mdl_t$coefficients['val'],
-      conj = mdl_t$coefficients['conj'],
-      rt = mdl_t$coefficients['ZMeanRT'])
+      conj = mdl_t$coefficients['conj'])
     
     # append data from current time point to overall data table
     rslts_all <- rbind(rslts_all, rslts_t)
@@ -266,27 +257,64 @@ for (sub in unique(data_dfun[, subID])) {
     data_dfun_t <- data_dfun_long[tpoint == t, ]
     
     # compute models
-    mdl_t_resp <- lsfit(x=data_dfun_t[, .(resp, resp_alt)], 
+    mdl_t_stim <- lsfit(x=data_dfun_t[, .(stim, stim_by_val)], 
                         y=data_dfun_t[, dfun])
-    mdl_t_rule <- lsfit(x=data_dfun_t[, .(rule, rule_alt)], 
+    mdl_t_resp <- lsfit(x=data_dfun_t[, .(resp, resp_by_val)], 
                         y=data_dfun_t[, dfun])
-    
+    mdl_t_resp2 <- lsfit(x=data_dfun_t[, .(resp, resp_by_val2)], 
+                        y=data_dfun_t[, dfun])
+    mdl_t_resp3 <- lsfit(x=data_dfun_t[, .(resp, resp_by_val3)], 
+                         y=data_dfun_t[, dfun])
+    mdl_t_rule <- lsfit(x=data_dfun_t[, .(rule, rule_by_val)], 
+                        y=data_dfun_t[, dfun])
     
     # add betas to data table
     rslts_t <- data.table(
       subID = sub,
+      tpoint = t,
       time = ts[t+1],
+      stim = mdl_t_stim$coefficients['stim'],
+      stim_by_val = mdl_t_stim$coefficients['stim_by_val'],
       resp = mdl_t_resp$coefficients['resp'],
-      resp_alt = mdl_t_resp$coefficients['resp_alt'],
+      resp_by_val = mdl_t_resp$coefficients['resp_by_val'],
+      resp2 = mdl_t_resp2$coefficients['resp'],
+      resp_by_val2 = mdl_t_resp2$coefficients['resp_by_val2'],
+      resp3 = mdl_t_resp3$coefficients['resp'],
+      resp_by_val3 = mdl_t_resp3$coefficients['resp_by_val3'],
       rule = mdl_t_rule$coefficients['rule'],
-      rule_alt = mdl_t_rule$coefficients['rule_alt'])
+      rule_by_val = mdl_t_rule$coefficients['rule_by_val'])
     
     # append data from current time point to overall data table
     rslts_int <- rbind(rslts_int, rslts_t)
   }
 }
 
-## Plot results ----------------------------------------------------------------
+## Relationship to behavioural VMAC effect
+rslts_int <- rslts_int[rslts_beh, on='subID']
+rslts_beh_by_rdm <- data.table()
+for (t in seq(0, n_tpoints - 1)) { # 
+  
+  # subset data
+  rslts_int_t <- rslts_int[tpoint==t,]
+  # run model
+  mdl_beh_t <- lm(cbind(vmac_away, vmac_toward) ~ resp + resp_by_val, data=rslts_int_t)
+  # save output
+  coefs_away = coef(summary(mdl_beh_t)[1])[[1]] # index 1 to get 'away'
+  coefs_toward = coef(summary(mdl_beh_t)[2])[[1]] # index 2 to get 'toward
+  rslts_beh_by_rdm_t <- data.table(
+    tpoint=t,
+    time = ts[t+1],
+    Rule = rep(c('away', 'toward'), each=3), 
+    Effect = rep(c('int', 'resp', 'resp_by_val'), times=2),
+    beta = c(coefs_away[1:3, 'Estimate'], coefs_toward[1:3, 'Estimate']),
+    std_err = c(coefs_away[1:3, 'Std. Error'], coefs_toward[1:3, 'Std. Error']), 
+    t_val = c(coefs_away[1:3, 't value'], coefs_toward[1:3, 't value']),
+    p_val = c(coefs_away[1:3, 'Pr(>|t|)'], coefs_toward[1:3, 'Pr(>|t|)'])
+  )
+  rslts_beh_by_rdm <- rbind(rslts_beh_by_rdm, rslts_beh_by_rdm_t)
+}
+
+## Plot RDM results ------------------------------------------------------------
 # theme for plotting 
 my_theme <- function() {
   theme(
@@ -319,9 +347,9 @@ se_function <- function(x) {
 
 ## plot all
 rslts_all_p <- rslts_all[, lapply(.SD, mean), by=time, 
-                 .SDcols=c('stim', 'resp', 'rule', 'val', 'conj', 'rt')]
+                 .SDcols=c('stim', 'resp', 'rule', 'val', 'conj')]
 rslts_all_se_p <- rslts_all[, lapply(.SD, se_function), by=time, 
-                  .SDcols=c('stim', 'resp', 'rule', 'val', 'conj', 'rt')]
+                  .SDcols=c('stim', 'resp', 'rule', 'val', 'conj')]
 rslts_all_p <- rslts_all_p[rslts_all_se_p,
                            on='time', 
                            j = .(time = time,
@@ -330,13 +358,11 @@ rslts_all_p <- rslts_all_p[rslts_all_se_p,
                                  resp = resp,
                                  val = val,
                                  conj = conj,
-                                 rt = rt,
                                  stim_se = i.stim,
                                  resp_se = i.resp,
                                  rule_se = i.rule,
                                  val_se = i.val,
-                                 conj_se = i.conj,
-                                 rt_se = i.rt)]
+                                 conj_se = i.conj)]
 
 plot_all <- ggplot(rslts_all_p, aes(x=time)) + 
   
@@ -359,7 +385,6 @@ plot_all <- ggplot(rslts_all_p, aes(x=time)) +
   # geom_ribbon(aes(y=val, ymin=val-val_se, ymax=val+val_se, fill='value'), alpha=.25) +
   geom_line(aes(y=conj, color='conjunction'), linewidth=1) +
   # geom_ribbon(aes(y=conj, ymin=conj-conj_se, ymax=conj+conj_se, fill='conjunction'), alpha=.25) +
-  geom_line(aes(y=rt), color='black', linetype=2) +
   
   # customise
   scale_y_continuous(name='Beta', 
@@ -484,20 +509,26 @@ plot_by_val <- ggplot(rslts_by_val_p,
 
 ## plot int
 rslts_int_p <- rslts_int[, lapply(.SD, mean), by=time, 
-                         .SDcols=c('resp', 'resp_alt', 'rule', 'rule_alt')]
+                         .SDcols=c('resp', 'resp_by_val', 'resp_by_val', 
+                                   'resp_by_val', 'rule', 'rule_by_val')]
 rslts_int_se_p <- rslts_int[, lapply(.SD, se_function), by=time, 
-                            .SDcols=c('resp', 'resp_alt', 'rule', 'rule_alt')]
+                            .SDcols=c('resp', 'resp_by_val', 'resp_by_val2', 
+                                      'resp_by_val3', 'rule', 'rule_by_val')]
 rslts_int_p <- rslts_int_p[rslts_int_se_p,
                            on='time', 
                            j = .(time = time,
                                  rule = rule,
-                                 rule_alt = rule_alt,
+                                 rule_by_val = rule_by_val,
                                  resp = resp,
-                                 resp_alt = resp_alt,
+                                 resp_by_val = resp_by_val,
+                                 resp_by_val2 = resp_by_val2,
+                                 resp_by_val3 = resp_by_val3,
                                  rule_se = i.rule,
-                                 rule_alt_se = i.rule_alt,
+                                 rule_by_val_se = i.rule_by_val,
                                  resp_se = i.resp,
-                                 resp_alt_se = i.resp_alt)]
+                                 resp_by_val_se = i.resp_by_val,
+                                 resp_by_val2_se = i.resp_by_val2,
+                                 resp_by_val3_se = i.resp_by_val3)]
 
 
 plot_int <- ggplot(rslts_int_p, aes(x=time)) + 
@@ -513,11 +544,14 @@ plot_int <- ggplot(rslts_int_p, aes(x=time)) +
   # add data
   geom_line(aes(y=resp, color='response'), linewidth=1) +
   # geom_ribbon(aes(y=resp, ymin=resp-resp_se, ymax=resp+resp_se, fill='stimulus'), alpha=.25) +
-  geom_line(aes(y=resp_alt, color='response_alt'), linewidth=1, linetype=2) +
+  geom_line(aes(y=resp_by_val, color='response_by_val'), linewidth=1, linetype=2) +
   # geom_ribbon(aes(y=resp_alt, ymin=resp_alt-resp_alt_se, ymax=resp_alt+resp_alt_se, fill='response_alt'), alpha=.25) +
-  geom_line(aes(y=rule, color='rule'), linewidth=1) +
+  geom_line(aes(y=resp_by_val2, color='response_by_val2'), linewidth=1, linetype=2) +
+  geom_line(aes(y=resp_by_val3, color='response_by_val3'), linewidth=1, linetype=2) +
+  
+  # geom_line(aes(y=rule, color='rule'), linewidth=1) +
   # geom_ribbon(aes(y=rule, ymin=rule-rule_se, ymax=rule+rule_se, fill='rule'), alpha=.25) +
-  geom_line(aes(y=rule_alt, color='rule_alt'), linewidth=1, linetype=2) + 
+  # geom_line(aes(y=rule_alt, color='rule_alt'), linewidth=1, linetype=2) + 
   # geom_ribbon(aes(y=rule_alt, ymin=rule_alt-rule_alt_se, ymax=rule_alt+rule_alt_se, fill='rule_alt'), alpha=.25) +
   
   # customise
@@ -529,13 +563,13 @@ plot_int <- ggplot(rslts_int_p, aes(x=time)) +
   scale_x_continuous(name='Time from rule onset (s)',
                      breaks=c(0, 0.3, 0.6, 0.9),
                      labels=c('0.0', '0.3', '0.6', '0.9')) +
-  scale_color_manual(name='',
-                     breaks=c('response', 'response_alt', 'rule', 'rule_alt'),
-                     values=c('response' = '#ed7953',
-                              'response_alt' = '#ed7953',
-                              'rule' = '#5c01a6',
-                              'rule_alt' = '#5c01a6'),
-                     labels=c('response', 'response_alt', 'rule', 'rule_alt')) +
+  # scale_color_manual(name='',
+  #                    breaks=c('response', 'response_alt', 'rule', 'rule_alt'),
+  #                    values=c('response' = '#ed7953',
+  #                             'response_alt' = '#ed7953',
+  #                             'rule' = '#5c01a6',
+  #                             'rule_alt' = '#5c01a6'),
+  #                    labels=c('response', 'response_alt', 'rule', 'rule_alt')) +
   # scale_fill_manual(name='',
   #                   breaks=c('response', 'response_alt', 'rule', 'rule_alt'),
   #                   values=c('response' = '#ed7953',
@@ -552,6 +586,98 @@ png(paste0(path_out, 'plt_int.png'),
     width=8, height=4, units='in', res=400)
 plot(plot_int)
 dev.off()
+
+
+## plot behavioural VMAC effect
+rslts_beh_melt <- melt(rslts_beh, 
+                       id.vars='subID',
+                       variable.name='rule',
+                       value.name='vmac_effect')[order(subID, rule)]
+
+ggplot(data=rslts_beh_melt,
+       aes(rule, vmac_effect)) + 
+  
+  # add zero line
+  geom_line(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(0, 0)), 
+            aes(x, y, group=1), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  
+  # add data
+  geom_line(aes(group=subID),
+            alpha=0.15,
+            position=position_jitter(width=0.1, seed=1234)) +
+  geom_point(aes(color=rule),
+             position=position_jitter(width=0.1, seed=1234)) +
+  geom_tufteboxplot(median.type='line',
+                    width=3,
+                    voffset=0.01,
+                    hoffset=0,
+                    position=position_nudge(x=c(-0.2, 0.2))) + 
+  # customise
+  geom_rangeframe(sides='lb', color='black') +
+  geom_rangeframe(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(-0.05, 0.025)),
+                  aes(x, y), size=1, color='black') +
+  scale_x_discrete(name='Rule',
+                   labels=c('away', 'toward')) +
+  scale_y_continuous(name='VMAC effect (high - low) (ms)',
+                     breaks=c(-0.05, -0.025, 0, 0.025),
+                     labels=c('-50', '-25', '0', '25'),
+                     limits=c(-0.060, 0.040)) + 
+    
+  my_theme() + 
+  scale_color_tableau()
+  
+
+# plot relationship between behavioural vmac effect and RDMs
+plot_beh_rdm <- ggplot(rslts_beh_by_rdm[effect != 'int', ], 
+                       aes(x=time, y=beta)) + 
+  
+  # add reference lines
+  geom_line(data=data.frame(x=c(0, 0), y=c(-0.6, 0.6)),
+            aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-0.6, 0.6)),
+            aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  geom_line(data=data.frame(x=c(0, 0.9), y=c(0, 0)),
+            aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  
+  # add data
+  geom_line(aes(group=interaction(rule, effect),
+                color=rule,
+                #linetype=effect
+                ),
+            linewidth=1) + 
+  facet_wrap('effect') + 
+
+  # customise
+  scale_y_continuous(name='Beta', 
+                     breaks=c(-0.6, -0.3, 0, 0.3, 0.6),
+                     labels=c('-0.6', '-0.3', '0.0', '0.3', '0.6'),
+                     limits=c(-0.65, 0.65),
+                     expand=expansion(mult = 0.1)) + 
+  scale_x_continuous(name='Time from rule onset (s)',
+                     breaks=c(0, 0.3, 0.6, 0.9),
+                     labels=c('0.0', '0.3', '0.6', '0.9')) +
+  # scale_color_manual(name='Rule',
+  #                    breaks=c('away', 'toward'),
+  #                    values=c('away' = '#ed7953',
+  #                             'toward' = '#5c01a6'),
+  #                    labels=c('away', 'toward')) +
+  # scale_fill_manual(name='',
+  #                   breaks=c('response', 'response_alt', 'rule', 'rule_alt'),
+  #                   values=c('response' = '#ed7953',
+  #                            'response_alt' = '#ed7953',
+  #                            'rule' = '#5c01a6',
+  #                            'rule_alt' = '#5c01a6'),
+  #                   labels=c('response', 'response_alt', 'rule', 'rule_alt')) +
+  geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-0.6, 0.6)),
+                  aes(x, y), size=1, color='black') +
+  my_theme() + 
+  scale_color_tableau() + 
+  theme(legend.position = 'top')
+
+
+
+
+
 ## Plot time course averaged over number of matching features ------------------
 # create model RDM vectors
 stim_vec <- c(1, 0, 1, 0, 1, 0, 1, 0)

@@ -19,7 +19,7 @@ srcDataEEG = sorted(Path(DATAPATH).glob('**/*.bdf'))
 srcDataBeh = sorted(Path(DATAPATH).glob('**/*beh.txt'))
 srcDataFrms = sorted(Path(DATAPATH).glob('**/*frms.txt'))
 
-for path in srcDataEEG[4:5]:
+for path in srcDataEEG[7:8]:
 
     # extract some BIDS info
     subID, task, modality = path.stem.split('_')
@@ -32,9 +32,9 @@ for path in srcDataEEG[4:5]:
     # load behavioural data file
     beh_path =  sorted(Path(DATAPATH).glob(f'**/{subID}*beh.txt')) 
     beh = pl.read_csv(beh_path[0], separator='\t')
-    idx = beh.filter(pl.col('Accuracy') != 1).select('RunningTrialNo').to_numpy()
-    # bl_idx = beh['Accuracy'] == 0
-
+    idx = beh.filter((pl.col('Accuracy') != 1) #| (pl.col('RT') < 0.15)
+                     ).select('RunningTrialNo').to_numpy() 
+    
     # set montage
     raw.set_montage(
         'biosemi64', 
@@ -70,7 +70,7 @@ for path in srcDataEEG[4:5]:
         shortest_event=1)
     
 
-    # modify events to eliminate errors ## NOTE: add misses to this
+    # modify events to eliminate errors 
     for i, j in enumerate(eeg_events[:, 2]): 
         if j in [150, 190, 250, 290, 350, 390, 450, 490, 550, 590, 650, 690, 750, 790, 850, 890]: # errors
             # if (eeg_events[i - 4, 2] in [110, 210, 310, 410, 510, 610, 710, 810]):
@@ -79,7 +79,7 @@ for path in srcDataEEG[4:5]:
                 eeg_events[i - 3, 2] = 999 #error or  miss
 
     # check this worked
-    sum(eeg_events[:, 2] == 999) == len(idx)
+    sum(eeg_events[:, 2] == 999) == len(idx) ## this might not work if exlcude RTs < 0.15 s
 
     # create event dictionary
     event_dict = {
