@@ -21,9 +21,9 @@ dt <- rbindlist(lapply(file.path(data_path, files), fread), fill = T)
 # setDT(data)
 
 # wrangle data
-exclude <- c('sub-12')
+exclude <- c('sub-12') # sub-07, sub-18, sub-24, sub-32
 dt <- dt[!(Subject %in% exclude), ]
-dt[, Reward := ifelse(Block < 13, 'colour-contingent reward', 'colour-invariant reward')]
+dt[, Reward := ifelse(Block < 13, '1-12', '13-20')]
 dt[, Error := ifelse(Accuracy == 1, 0, 1)]
 dt$Subject <- as.factor(dt$Subject)
 dt$DistractorValue <- as.factor(dt$DistractorValue)
@@ -31,7 +31,7 @@ dt$ResponseRule <- as.factor(dt$ResponseRule)
 dt$Reward <- as.factor(dt$Reward)
 
 # remove missing responses
-p_dat <- dt[Accuracy == 1, 
+p_dat <- dt[Accuracy != 999, 
      .(MeanRT=mean(RT),
        MeanAC=mean(Accuracy),
        MeanER=mean(Error)),
@@ -161,63 +161,65 @@ plot(fig)
 dev.off()
 
 ## run statistics
-rt_aov <- anovaBF(MeanRT ~ ResponseRule*DistractorValue*Reward + Subject, 
+rt_aov <- anovaBF(MeanRT ~ ResponseRule*DistractorValue + Subject, 
                   whichRandom = 'Subject', 
-                  whichModels = 'withmain',
-                  data=p_dat)
+                  whichModels = 'all',
+                  data=p_dat[Reward=='1-12'])
 
 er_aov <- anovaBF(MeanER ~ ResponseRule*DistractorValue + Subject, 
                   whichRandom = 'Subject', 
                   whichModels = 'all',
-                  data=p_dat[Reward=='13-20'])
+                  data=p_dat[Reward=='1-12'])
 
 
 ### VMAC effect ================================================================
-p_dat_wide <- dcast.data.table(p_dat, 
-                               Subject + Reward  ~ ResponseRule + DistractorValue,
-                               value.var = 'MeanRT')
-
-p_vmac <- p_dat_wide[, .(vmac_away = A_high - A_low,
-                         vmac_toward = T_high - T_low),
-                     by=c('Subject', 'Reward')]
-
 # find subjects that show both VMAC effects
 # p_vmac <- p_vmac[(Reward == '1-12') & (vmac_away < 0 & vmac_toward > 0), ]
 # vmac_subs <- c('sub-01', 'sub-04', 'sub-05', 'sub-06', 
 #                'sub-09', 'sub-10', 'sub-13', 'sub-20', 
 #                'sub-21', 'sub-28')
 
-p_vmac_long <- p_vmac[, melt(.SD, 
-                           id.vars=c('Subject', 'Reward'), 
-                           variable.name='rule',
-                           value.name="vmac_effect"),
-                      .SDcols=Subject:vmac_toward
+## Reaction time ---------------------------------------------------------------
+p_dat_wide_rt <- dcast.data.table(p_dat, 
+                                  Subject + Reward  ~ ResponseRule + DistractorValue,
+                                  value.var = 'MeanRT')
+
+p_vmac_rt <- p_dat_wide_rt[, .(vmac_away = A_high - A_low,
+                               vmac_toward = T_high - T_low),
+                           by=c('Subject', 'Reward')]
+
+
+p_vmac_long_rt <- p_vmac_rt[, melt(.SD, 
+                                   id.vars=c('Subject', 'Reward'), 
+                                   variable.name='rule',
+                                   value.name="vmac_effect"),
+                            .SDcols=Subject:vmac_toward
 ][order(Subject, rule)]
 
-p_vmac_long_gav <- p_vmac_long[, 
-                               .(mean_vmac_effect = mean(vmac_effect)), 
-                               by=c('Reward', 'rule')]
+p_vmac_long_rt_gav <- p_vmac_long_rt[, 
+                                     .(mean_vmac_effect = mean(vmac_effect)), 
+                                     by=c('Reward', 'rule')]
 
-plot_vmac_rc <- ggplot() + 
+plot_vmac_rt_rc <- ggplot() + 
   
   # add zero line
   geom_line(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(0, 0)), 
             aes(x, y, group=1), linetype = 3, linewidth=0.8, alpha = 0.4) +
   
   # add data
-  geom_line(data=p_vmac_long[Reward=='colour-contingent reward'],
+  geom_line(data=p_vmac_long_rt[Reward=='1-12'],
             aes(x=rule, y=vmac_effect, group=Subject),
             alpha=0.1,
             position=position_jitter(width=0.1, seed=1234)) +
-  geom_point(data=p_vmac_long[Reward=='colour-contingent reward'],
+  geom_point(data=p_vmac_long_rt[Reward=='1-12'],
              aes(x=rule, y=vmac_effect, color=rule),
              alpha=0.25,
              position=position_jitter(width=0.1, seed=1234)) +
-  geom_line(data=p_vmac_long_gav[Reward=='colour-contingent reward'],
+  geom_line(data=p_vmac_long_rt_gav[Reward=='1-12'],
             aes(x=rule, y=mean_vmac_effect, group=1),
             linetype=2,
             size=1) +
-  geom_point(data=p_vmac_long_gav[Reward=='colour-contingent reward'],
+  geom_point(data=p_vmac_long_rt_gav[Reward=='1-12'],
              aes(x=rule, y=mean_vmac_effect, color=rule),
              fill='white',
              size=3,
@@ -237,7 +239,7 @@ plot_vmac_rc <- ggplot() +
   scale_y_continuous(name='VMAC effect (ms) (high - low)',
                      breaks=c(-0.1, -0.05, 0, 0.05),
                      labels=c('-100', '-50', '0', '50'),
-                     limits=c(-0.1, 0.07)) + 
+                     limits=c(-0.1, 0.07)) +
   scale_color_manual(name='rule',
                      breaks=c('vmac_toward', 'vmac_away'),
                      values=c('vmac_toward' = '#B07AA1',
@@ -245,28 +247,28 @@ plot_vmac_rc <- ggplot() +
                      labels=c('high', 'low')) +
   geom_rangeframe(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(-0.1, 0.05)),
                   aes(x, y), size=1, color='black') +
-  my_theme() #+ scale_color_tableau()
+  my_theme()
 
-plot_vmac_ex <- ggplot() + 
+plot_vmac_rt_ex <- ggplot() + 
   
   # add zero line
   geom_line(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(0, 0)), 
             aes(x, y, group=1), linetype = 3, linewidth=0.8, alpha = 0.4) +
   
   # add data
-  geom_line(data=p_vmac_long[Reward=='colour-invariant reward'],
+  geom_line(data=p_vmac_long_rt[Reward=='13-20'],
             aes(x=rule, y=vmac_effect, group=Subject),
             alpha=0.1,
             position=position_jitter(width=0.1, seed=1234)) +
-  geom_point(data=p_vmac_long[Reward=='colour-invariant reward'],
+  geom_point(data=p_vmac_long_rt[Reward=='13-20'],
              aes(x=rule, y=vmac_effect, color=rule),
              alpha=0.25,
              position=position_jitter(width=0.1, seed=1234)) +
-  geom_line(data=p_vmac_long_gav[Reward=='colour-invariant reward'],
+  geom_line(data=p_vmac_long_rt_gav[Reward=='13-20'],
             aes(x=rule, y=mean_vmac_effect, group=1),
             linetype=2,
             size=1) +
-  geom_point(data=p_vmac_long_gav[Reward=='colour-invariant reward'],
+  geom_point(data=p_vmac_long_rt_gav[Reward=='13-20'],
              aes(x=rule, y=mean_vmac_effect, color=rule),
              fill='white',
              size=3,
@@ -286,7 +288,7 @@ plot_vmac_ex <- ggplot() +
   scale_y_continuous(name='VMAC effect (ms) (high - low)',
                      breaks=c(-0.1, -0.05, 0, 0.05),
                      labels=c('-100', '-50', '0', '50'),
-                     limits=c(-0.1, 0.07)) + 
+                     limits=c(-0.1, 0.07)) +
   scale_color_manual(name='rule',
                      breaks=c('vmac_toward', 'vmac_away'),
                      values=c('vmac_toward' = '#B07AA1',
@@ -296,13 +298,141 @@ plot_vmac_ex <- ggplot() +
                   aes(x, y), size=1, color='black') +
   my_theme()
 
-fig_vmac <- ggdraw() +
-  draw_plot(plot_vmac_rc, x = 0, y = 0, width = 0.5, height = 1) +
-  draw_plot(plot_vmac_ex, x = 0.5, y = 0, width = 0.5, height = 1) 
+## Error rate ------------------------------------------------------------------
+p_dat_wide_er <- dcast.data.table(p_dat, 
+                               Subject + Reward  ~ ResponseRule + DistractorValue,
+                               value.var = 'MeanER')
 
-svg(paste0(path_out, "fig_vmac_ex_by_block.svg"),
-    width=8, height=8)
-plot(plot_vmac_ex)
+p_vmac_er <- p_dat_wide_er[, .(vmac_away = A_high - A_low,
+                         vmac_toward = T_high - T_low),
+                     by=c('Subject', 'Reward')]
+
+
+p_vmac_long_er <- p_vmac_er[, melt(.SD, 
+                           id.vars=c('Subject', 'Reward'), 
+                           variable.name='rule',
+                           value.name="vmac_effect"),
+                      .SDcols=Subject:vmac_toward
+][order(Subject, rule)]
+
+p_vmac_long_er_gav <- p_vmac_long_er[, 
+                               .(mean_vmac_effect = mean(vmac_effect)), 
+                               by=c('Reward', 'rule')]
+
+plot_vmac_er_rc <- ggplot() + 
+  
+  # add zero line
+  geom_line(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(0, 0)), 
+            aes(x, y, group=1), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  
+  # add data
+  geom_line(data=p_vmac_long_er[Reward=='1-12'],
+            aes(x=rule, y=vmac_effect, group=Subject),
+            alpha=0.1,
+            position=position_jitter(width=0.1, seed=1234)) +
+  geom_point(data=p_vmac_long_er[Reward=='1-12'],
+             aes(x=rule, y=vmac_effect, color=rule),
+             alpha=0.25,
+             position=position_jitter(width=0.1, seed=1234)) +
+  geom_line(data=p_vmac_long_er_gav[Reward=='1-12'],
+            aes(x=rule, y=mean_vmac_effect, group=1),
+            linetype=2,
+            size=1) +
+  geom_point(data=p_vmac_long_er_gav[Reward=='1-12'],
+             aes(x=rule, y=mean_vmac_effect, color=rule),
+             fill='white',
+             size=3,
+             alpha=1,
+             stroke=1.25,
+             shape=23) +
+  geom_tufteboxplot(median.type='line',
+                    width=3,
+                    voffset=0.01,
+                    hoffset=0,
+                    position=position_nudge(x=c(-0.2, 0.2))) + 
+  # facet_wrap('Block', nrow=3) +
+  
+  # customise
+  scale_x_discrete(name='Rule',
+                   labels=c('A', 'T')) +
+  scale_y_continuous(name='VMAC effect (%) (high - low)',
+                     breaks=c(-0.1, 0, 0.1, 0.2),
+                     labels=c('-10', '0', '10', 20),
+                     limits=c(-0.125, 0.2)) + 
+  scale_color_manual(name='rule',
+                     breaks=c('vmac_toward', 'vmac_away'),
+                     values=c('vmac_toward' = '#B07AA1',
+                              'vmac_away' = '#a4a5d5'),
+                     labels=c('high', 'low')) +
+  geom_rangeframe(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(-0.1, 0.2)),
+                  aes(x, y), size=1, color='black') +
+  my_theme()
+
+plot_vmac_er_ex <- ggplot() + 
+  
+  # add zero line
+  geom_line(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(0, 0)), 
+            aes(x, y, group=1), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  
+  # add data
+  geom_line(data=p_vmac_long_er[Reward=='13-20'],
+            aes(x=rule, y=vmac_effect, group=Subject),
+            alpha=0.1,
+            position=position_jitter(width=0.1, seed=1234)) +
+  geom_point(data=p_vmac_long_er[Reward=='13-20'],
+             aes(x=rule, y=vmac_effect, color=rule),
+             alpha=0.25,
+             position=position_jitter(width=0.1, seed=1234)) +
+  geom_line(data=p_vmac_long_er_gav[Reward=='13-20'],
+            aes(x=rule, y=mean_vmac_effect, group=1),
+            linetype=2,
+            size=1) +
+  geom_point(data=p_vmac_long_er_gav[Reward=='13-20'],
+             aes(x=rule, y=mean_vmac_effect, color=rule),
+             fill='white',
+             size=3,
+             alpha=1,
+             stroke=1.25,
+             shape=23) +
+  geom_tufteboxplot(median.type='line',
+                    width=3,
+                    voffset=0.01,
+                    hoffset=0,
+                    position=position_nudge(x=c(-0.2, 0.2))) + 
+  # facet_wrap('Block', nrow=2) +
+  
+  # customise
+  scale_x_discrete(name='Rule',
+                   labels=c('A', 'T')) +
+  scale_y_continuous(name='VMAC effect (%) (high - low)',
+                     breaks=c(-0.1, 0, 0.1, 0.2),
+                     labels=c('-10', '0', '10', 20),
+                     limits=c(-0.125, 0.2)) + 
+  scale_color_manual(name='rule',
+                     breaks=c('vmac_toward', 'vmac_away'),
+                     values=c('vmac_toward' = '#B07AA1',
+                              'vmac_away' = '#a4a5d5'),
+                     labels=c('high', 'low')) +
+  geom_rangeframe(data=data.frame(x=c('vmac_away', 'vmac_toward'), y=c(-0.1, 0.2)),
+                  aes(x, y), size=1, color='black') +
+  my_theme() 
+
+
+fig_vmac <- plot_grid(
+  plot_vmac_rt_rc, 
+  plot_vmac_rt_ex,
+  plot_vmac_er_rc,
+  plot_vmac_er_ex,
+  ncol=2, nrow=2,
+  axis='tlbr',
+  rel_heights=c(1, 1),
+  align="hv")
+
+  
+
+svg(paste0(path_out, "fig_beh_vmac.svg"),
+    width=8, height=7)
+plot(fig_vmac)
 dev.off()
 
 
@@ -311,5 +441,7 @@ vmac_aov <- anovaBF(vmac_effect ~ Reward*rule + Subject,
                   whichRandom = 'Subject', 
                   whichModels = 'all',
                   data=p_vmac_long)
+
+## Behavioural RSA 
 
 
