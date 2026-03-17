@@ -13,13 +13,13 @@ import matplotlib.pyplot as plt
 %matplotlib qt
 
 ## set data paths
-DATAPATH = "C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/data/" 
-SAVEPATH = "C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/preprocessed_data/"
+DATAPATH = ''
+SAVEPATH = ''
 srcDataEEG = sorted(Path(DATAPATH).glob('**/*.bdf'))
 srcDataBeh = sorted(Path(DATAPATH).glob('**/*beh.txt'))
 srcDataFrms = sorted(Path(DATAPATH).glob('**/*frms.txt'))
 
-for path in srcDataEEG[7:8]:
+for path in srcDataEEG[33:]:
 
     # extract some BIDS info
     subID, task, modality = path.stem.split('_')
@@ -32,7 +32,7 @@ for path in srcDataEEG[7:8]:
     # load behavioural data file
     beh_path =  sorted(Path(DATAPATH).glob(f'**/{subID}*beh.txt')) 
     beh = pl.read_csv(beh_path[0], separator='\t')
-    idx = beh.filter((pl.col('Accuracy') != 1) #| (pl.col('RT') < 0.15)
+    idx = beh.filter((pl.col('Accuracy') != 1) 
                      ).select('RunningTrialNo').to_numpy() 
     
     # set montage
@@ -69,7 +69,6 @@ for path in srcDataEEG[7:8]:
         output='onset', 
         shortest_event=1)
     
-
     # modify events to eliminate errors 
     for i, j in enumerate(eeg_events[:, 2]): 
         if j in [150, 190, 250, 290, 350, 390, 450, 490, 550, 590, 650, 690, 750, 790, 850, 890]: # errors
@@ -79,7 +78,7 @@ for path in srcDataEEG[7:8]:
                 eeg_events[i - 3, 2] = 999 #error or  miss
 
     # check this worked
-    sum(eeg_events[:, 2] == 999) == len(idx) ## this might not work if exlcude RTs < 0.15 s
+    sum(eeg_events[:, 2] == 999) == len(idx) 
 
     # create event dictionary
     event_dict = {
@@ -142,10 +141,10 @@ for path in srcDataEEG[7:8]:
         }
 
     # plot events
-    mne.viz.plot_events(eeg_events, 
-                        event_id=event_dict,
-                        on_missing='warn',
-                        sfreq=raw.info['sfreq'])
+    # mne.viz.plot_events(eeg_events, 
+    #                     event_id=event_dict,
+    #                     on_missing='warn',
+    #                     sfreq=raw.info['sfreq'])
 
     # check event counts
     for key, val in event_dict.items():
@@ -164,7 +163,7 @@ for path in srcDataEEG[7:8]:
     raw.set_annotations(break_annots)
 
     # plot raw data
-    raw.plot()
+    # raw.plot()
 
     ## Start actual pre-processing ---------------------------------------------------------
 
@@ -181,7 +180,7 @@ for path in srcDataEEG[7:8]:
                                                          'hurst'])
 
     # check filtered data to make sure no bad channels were missed and mark bad sections
-    filt_h.plot()
+    # filt_h.plot()
 
     # handle bad channels
     intrp = filt_h.copy().interpolate_bads()   
@@ -198,8 +197,8 @@ for path in srcDataEEG[7:8]:
     ICA.fit(ica_data, decim=8) # speed up processing
 
     # check ICA components on filtered data
-    ICA.plot_sources(filt_l, show_scrollbars=False)
-    ICA.plot_components()
+    # ICA.plot_sources(filt_l, show_scrollbars=False)
+    # ICA.plot_components()
     # automatically find the ICs that best match the EOG signal
     eog_indices, eog_scores = ICA.find_bads_eog(filt_l)
     print(f'EOG indicies: {eog_indices}')
@@ -207,7 +206,7 @@ for path in srcDataEEG[7:8]:
 
     # apply ICA 
     ICA.apply(filt_l)
-    filt_l.plot()
+    # filt_l.plot()
 
     # crop data into reward and extinction segments
     block13_samp = eeg_events[:, 2] == 913 # block 13
