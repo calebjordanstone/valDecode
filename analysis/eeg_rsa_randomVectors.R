@@ -16,18 +16,17 @@ library(paletteer)
 source(file.path("my_theme.R"))
 
 # set data paths
-path_exp <- "C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/"
-path_out <- paste0(path_exp, 'output/')
-path_data <- paste0(path_exp, 'data/')
+# path_exp <- ""
+# path_out <- ""
+# path_data <- ""
 
-# load data
-files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_avg_etc_sub') ################ cue-locked, reward contingency blocks - change here for different epochs
-data_dfun <- rbindlist(lapply(file.path(path_out, files_dfun), fread))
 ## Run analysis ----------------------------------------------------------------
-n_tpoints = 282 # epochs are from -0.1 s to 1 s relative to cue onset
-n_iter <- 1000
-n_subs <- 39
-ts <- seq(-0.1, 1, length.out=n_tpoints) # put time samples into actual times
+# Load data 
+# Note: loads data files containing decision function values per subject per 
+# time point per trial for a given phase (reward/extinction). Change file names
+# here to get data from a different phase
+files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_sub') 
+data_dfun <- rbindlist(lapply(file.path(path_out, files_dfun), fread))
 
 # define full model RDMs
 # Trig codes: 1, 2, 3, 4, 5, 6, 7, 8  
@@ -77,33 +76,33 @@ x <- c(rep(1, times=12), rep(0, times=16))
 x_samp <- sample(x)
 ## Add first iteration to list
 cols <- list(x_samp)
-## Create a loop where I shuffle the vector, and then add it to the list of shuffled vectors only if it doesn't match any of the previous. Do this until 1000 vectors.
+# ## Create a loop where I shuffle the vector, and then add it to the list of shuffled vectors only if it doesn't match any of the previous. Do this until 10000 vectors.
+n_iter <- 10000 
 n <- 1
 while (n < n_iter) {
   x_samp <- sample(x)
   comp_vect <- vector(mode='logical', length=n_iter)
   for (col in seq(1, length(cols))) {
-    comp_vect[col] <- identical(cols[col], x_samp) 
+    comp_vect[col] <- identical(cols[col], x_samp)
   }
-  if (any(comp_vect)) { 
+  if (any(comp_vect)) {
       next
   } else {
     cols <- append(cols, list(x_samp))
     n <- n + 1
   }
 }
-# save random vectors
+# # save random vectors
 dt <- data.table(do.call(cbind, cols))
-write_csv(dt, paste0(path_out, 'random_vec.csv'))
+write_csv(dt, paste0(path_out, 'random_vec_10000.csv'))
+#dt <- fread(paste0(path_out, 'random_vec_10000.csv')) # load the random vectors used in the paper
 
-# loop through participants
-dt_len <- n_iter*n_tpoints*n_subs
-rslts_all <- data.table(rand_vect=integer(length=dt_len),
-                        subID = character(length=dt_len),
-                        tpoint = integer(length=dt_len),
-                        time = numeric(length=dt_len),
-                        rand = numeric(length=dt_len))
-row <- 1
+# Loop through participants
+# Note that this part of the script takes a very long time to run
+n_tpoints = 282 # epochs are from -0.1 s to 1 s relative to cue onset
+ts <- seq(-0.1, 1, length.out=n_tpoints) # put time samples into actual times=
+n_subs <- 39
+dt_len <- n_iter*n_tpoints # shape out output file per timepoint
 for (sub in unique(data_dfun[, subID])) {
   
   # update progress 
@@ -116,18 +115,20 @@ for (sub in unique(data_dfun[, subID])) {
                        width = 50,   # Progress bar width. Defaults to getOption("width")
                        char = "=")   # Character used to create the bar
   
-  # ## Wrangling data ##
-  # # get condition RTs
-  # data_beh_sub <- data_beh[Subject == sub & Accuracy == 1 & Block < 13] ## change this if looking at extinction blocks
-  # data_beh_sub_av <- data_beh_sub[,
-  #                                 .(MeanRT=mean(RT)),
-  #                                 by = .(DistractorValue, ResponseRule, TargetPosition)
-  # ][order(DistractorValue, -ResponseRule, TargetPosition)]
-  # data_beh_sub_av[, ':=' (zMeanRT = scale(MeanRT),
-  #                         class = as.integer(paste0(seq(1, 8), '10')))]
-  # 
+  # create dataframe to save to 
+  rslts_all <- data.table(rand_vect=integer(length=dt_len),
+                          subID = character(length=dt_len),
+                          tpoint = integer(length=dt_len),
+                          time = numeric(length=dt_len),
+                          rand = numeric(length=dt_len))
+
   # put data_dfun into long format
   data_dfun_sub <- data_dfun[subID == sub]
+  data_dfun_sub <- data_dfun_sub[, 
+                                 lapply(.SD, mean), 
+                                 .SDcols = dfun_110:dfun_810, 
+                                 by=c('event_type', 'event_group', 'RT', 
+                                      'y', 'tpoint', 'subID')]
   data_dfun_long <- transpose(data_dfun_sub[, dfun_110:dfun_810, ])
   data_dfun_long[, class := as.integer(paste0(seq(1, 8), '10'))]
   data_dfun_long <- melt(data_dfun_long, id.vars='class',
@@ -136,7 +137,9 @@ for (sub in unique(data_dfun[, subID])) {
   data_dfun_ids = data.table( # create data table of ID variables
     y = rep(data_dfun_sub[, y], each=8),
     tpoint = rep(data_dfun_sub[, tpoint], each=8),
-    subID = rep(data_dfun_sub[, subID], each=8))
+    subID = rep(data_dfun_sub[, subID], each=8),
+    event_group = rep(data_dfun_sub[, event_group], each=8),
+    RT = rep(data_dfun_sub[, RT], each=8))
   data_dfun_long <- cbind(data_dfun_ids, data_dfun_long) # add ID variables back to data
   setorder(data_dfun_long, y, tpoint, trial_by_tpoint, class) # make sure things are ordered correctly
   
@@ -183,13 +186,14 @@ for (sub in unique(data_dfun[, subID])) {
                          conj =ifelse(y==class, 1, 0))]
   
   # loop through random vectors
+  row <- 1
   for (rand_vect_no in seq(1, n_iter)) {
     
     # set probress bar to current state
     setTxtProgressBar(pb, rand_vect_no)
     
     # get vector
-    rand_vect <- cols[rand_vect_no]
+    rand_vect <- dt[, ..rand_vect_no]
     # generate an 8x8 identify matrix
     mat_rand <- diag(1, 8)
     # fill in upper triangle with x_samp
@@ -222,7 +226,6 @@ for (sub in unique(data_dfun[, subID])) {
       data_dfun_t <- data_dfun_long[tpoint == t, ]
       
       # compute model
-      # mdl <- lm(dfun ~ stim + resp + rule + val, data = t_dat)
       mdl_t <- lsfit(x=data_dfun_t[, .(stim, resp, rule, val, conj, rand)],
                      y=data_dfun_t[, dfun])
       
@@ -242,19 +245,23 @@ for (sub in unique(data_dfun[, subID])) {
       row <- row + 1
     }
   }
+  
+  # close the progress bar
+  close(pb) 
+  # save
+  write_csv(rslts_all, paste0(path_out, 'rslts_cue_rc_random_vectors_10000_', sub, '.csv'))
 }
-# close the progress bar
-close(pb) 
-
-write_csv(rslts_all, paste0(path_out, 'rslts_random_vectors.csv'))
 
 ## Run cluster-based permutation test ------------------------------------------
-exclude <- c('sub-12') # 'sub-24' 'sub-07', 'sub-18', 'sub-32'
+exclude <- c('sub-12')
 critical_t <- 2.023 # 38 degrees of freedom
-## load data
-rslts_cue_rc_by_val_int <- fread(paste0(path_out, 'rslts_cue_rc_by_val_int.csv'))
 
-# write function to extract BFs
+## load data 
+rslts_cue_rc_by_val_int <- fread(paste0(path_out, 'rslts_cue_rc_by_val_int.csv')) # load interaction results from eeg_rsa_run.R script
+files_dfun <- list.files(path_out, pattern = 'rslts_cue_rc_random_vectors_10000_sub') # load results of random vectors for each subject from the section above in this script
+rslts_cue_rc_random_vectors <- rbindlist(lapply(file.path(path_out, files_dfun), fread))
+
+# write function to extract t values
 extract_t_1samp <- function(x) {
   res <- t.test(x, mu=0, alternative='two.sided')
   t <- as.numeric(res$statistic)
@@ -262,7 +269,7 @@ extract_t_1samp <- function(x) {
 }
 
 # run t-test on empirical data
-rslts_cue_rc_by_val_int_t <- rslts_cue_rc_by_val_int[, 
+rslts_cue_rc_by_val_int_t <- rslts_cue_rc_by_val_int[,
                         lapply(.SD, extract_t_1samp), 
                         .SDcols=c('rule_by_val', 'resp_by_val', 'stim_by_val'),
                         by=c('tpoint', 'time')
@@ -283,7 +290,7 @@ ggplot(data=rslts_cue_rc_by_val_int_t,
   facet_wrap("effect")
 
 # sum clusters
-running_sim <- 0
+running_sum <- 0
 summer <- function(x) {
   if (is.na(x)) {running_sum <<- 0} 
   else {
@@ -295,38 +302,67 @@ rslts_cue_rc_by_val_int_t[,
                           cluster_sums := summer(abv_thshld), 
                           by=1:nrow(rslts_cue_rc_by_val_int_t)]
 
-# find largest absolute cluseter for each effect
+# find largest absolute cluster for each effect
 rslts_cue_rc_by_val_int_t[, max(abs(cluster_sums)), by='effect']
 
 # run t-tests on random data
-rslts_all_t <- rslts_all[, 
+rslts_cue_rc_random_vectors_t <- rslts_cue_rc_random_vectors[, 
                          lapply(.SD, extract_t_1samp), 
                          .SDcols='rand',
                          by=c('rand_vect', 'tpoint')
 ][, ':=' (abv_thshld = ifelse(abs(rand) > critical_t, rand, NA))]
+
 # sum clusters
-rslts_all_t[, 
+rslts_cue_rc_random_vectors_t[, 
             cluster_sums := summer(abv_thshld), 
-            by=1:nrow(rslts_all_t)]
-# generate the permutation distribution
-permutation_distribution <- rslts_all_t[, 
+            by=1:nrow(rslts_cue_rc_random_vectors_t)]
+
+# generate the permutation distribution for absolute values
+permutation_distribution_abs <- rslts_cue_rc_random_vectors_t[, 
                                         .(max_cluster_val=max(abs(cluster_sums))), 
                                         by='rand_vect']
-# find p-values of clusters
-(sum(permutation_distribution$max_cluster_val > 16.41693)/1000) # rule_by_val interaction
-(sum(permutation_distribution$max_cluster_val > 21.05875)/1000) # resp_by_val interaction
-(sum(permutation_distribution$max_cluster_val > 75.22756)/1000) # stim_by_val interaction
+permutation_distribution_abs <- permutation_distribution_abs[order(-max_cluster_val)][, index := seq(1, .N)]
+
+# get p-values based on the cluster-based permutation testing
+# reward phase
+(sum(permutation_distribution_abs$max_cluster_val > 32.07802)/10000) # rule_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 87.66451)/10000) # resp_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 159.75321)/10000) # stim_by_val interaction,
+
+# extinction phase
+(sum(permutation_distribution_abs$max_cluster_val > 40.49683)/10000) # rule_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 37.78144)/10000) # resp_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 46.84464)/10000) # stim_by_val interaction,
+
+
+# plot absolute permutation distribution
+ggplot() + 
+  geom_histogram(data=permutation_distribution_abs, 
+                 aes(x=max_cluster_val),
+                 bins=25) + 
+  geom_vline(xintercept=32.07802, color='#9467bd', linewidth=1) + 
+  geom_vline(xintercept=87.66451, color='#e377c2', linewidth=1) + 
+  geom_vline(xintercept=159.75321, color='#17becf', linewidth=1)
+
 
 ## plot interactions
 # average across subjects
 rslts_cue_rc_by_val_int_p <- rslts_cue_rc_by_val_int[!(subID %in% exclude), 
-                                                     lapply(.SD, mean), by=c('time'), 
+                                                     lapply(.SD, mean), by=c('time', 'tpoint'), 
                                                      .SDcols=c('rule_by_val',
                                                                'stim_by_val',
-                                                               'resp_by_val' )]
+                                                               'resp_by_val')]
+std_err <- function(x) {
+  se <- sd(x) / sqrt(39)
+}
+
+rslts_cue_rc_by_val_int_se <- rslts_cue_rc_by_val_int[!(subID %in% exclude), 
+                                                      lapply(.SD, std_err), by=c('time'), 
+                                                      .SDcols=rule_int:resp_by_val]
 # add significance line
-rslts_cue_rc_by_val_int_p[, stim_by_val_cluster := ifelse(time >= 0.610 & time <= 0.703, -0.08, NA)]
-  
+rslts_cue_rc_by_val_int_p[, ':=' (resp_by_val_cluster = ifelse((tpoint > 202 & tpoint < 232), -0.07, NA),
+                                  stim_by_val_cluster = ifelse((tpoint > 188 & tpoint < 231), -0.08, NA))]
+
 plot_cue_rc_by_val_int <- ggplot() + 
   
   # add reference lines
@@ -341,23 +377,45 @@ plot_cue_rc_by_val_int <- ggplot() +
             aes(x=time, y=rule_by_val), color='#9467bd',
             linewidth=1,
             linetype=1) +
-
+  geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
+                  y=rslts_cue_rc_by_val_int_p$rule_by_val,
+                  ymin=rslts_cue_rc_by_val_int_p$rule_by_val - rslts_cue_rc_by_val_int_se$rule_by_val,
+                  ymax=rslts_cue_rc_by_val_int_p$rule_by_val + rslts_cue_rc_by_val_int_se$rule_by_val),
+              fill='#9467bd',
+              alpha=0.2,
+              color=NA) +
   geom_line(data=rslts_cue_rc_by_val_int_p,
             aes(x=time, y=stim_by_val), color='#17becf',
             linewidth=1,
             linetype=1) +
-
+  geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
+                  y=rslts_cue_rc_by_val_int_p$stim_by_val,
+                  ymin=rslts_cue_rc_by_val_int_p$stim_by_val - rslts_cue_rc_by_val_int_se$stim_by_val,
+                  ymax=rslts_cue_rc_by_val_int_p$stim_by_val + rslts_cue_rc_by_val_int_se$stim_by_val),
+              fill='#17becf',
+              alpha=0.2,
+              color=NA) +
   geom_line(data=rslts_cue_rc_by_val_int_p,
             aes(x=time, y=resp_by_val), color='#e377c2',
             linewidth=1,
             linetype=1) +
-  
+  geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
+                  y=rslts_cue_rc_by_val_int_p$resp_by_val,
+                  ymin=rslts_cue_rc_by_val_int_p$resp_by_val - rslts_cue_rc_by_val_int_se$resp_by_val,
+                  ymax=rslts_cue_rc_by_val_int_p$resp_by_val + rslts_cue_rc_by_val_int_se$resp_by_val),
+              fill='#e377c2',
+              alpha=0.2,
+              color=NA) +
   # add significance line
   geom_line(data=rslts_cue_rc_by_val_int_p,
             aes(x=time, y=stim_by_val_cluster), color='#17becf',
             linewidth=2,
             linetype=1) +
- 
+  geom_line(data=rslts_cue_rc_by_val_int_p,
+            aes(x=time, y=resp_by_val_cluster), color='#e377c2',
+            linewidth=2,
+            linetype=1) +
+
   # customise
   scale_y_continuous(name='Beta',
                      breaks=c(-0.1, 0, 0.1),
@@ -371,9 +429,7 @@ plot_cue_rc_by_val_int <- ggplot() +
                   aes(x, y), size=1, color='black') +
   my_theme() + theme(legend.position = 'top')
 
-svg(paste0(path_out, 'fig_cue_rc_int_stim_permutations.svg'),
+svg(paste0(path_out, 'fig_cue_rc_permutations.svg'),
     width=8, height=4)
 plot(plot_cue_rc_by_val_int)
 dev.off()
-
-
