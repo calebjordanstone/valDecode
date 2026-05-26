@@ -1,3 +1,11 @@
+## Notes: This script takes preprocessed, epoched EEG data and raw behavioural data and performs the following:
+# 1) Drops bad epochs and those that are excluded in the behavioural analysis, equalises the event counts 
+# per trial/epoch type, and creates averages of 4 epochs of the same trial/epoch type to increase SNR in the decoding analyses
+# 2) Multi-class decoding to extract decision-functions per trial,  time point, and subject
+# 3) Binary decoding separaetly for high- and low-value trials per time point and subject
+## Input data can be found in "preprocessed_EEG_data" and "raw_behavioural_data.csv", at https://osf.io/2x3a8/files/osfstorage
+## Output data can be found in "decode_by_value_results_files.zip" and "multiclass_decoding_results_files.zip", found at the above link. 
+
 import mne
 import re
 import polars as pl
@@ -9,12 +17,11 @@ from pathlib import Path
 %matplotlib qt
 
 # load data
-DATAPATH = "C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/data/" 
-EPOCHPATH = 'C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/preprocessed_data_allTrials/'
-SAVEPATH = 'C:/Users/cstone/OneDrive - UNSW/Documents/Projects/my_experiments/val_decode/output_allTrials_8xcv/'
+EPOCHPATH = ''
+SAVEPATH = ''
 extension = 'cue'
 epoch_paths = sorted(Path(EPOCHPATH).glob(f'sub*/*{extension}.fif')) 
-beh_all = pl.read_csv(DATAPATH + "valDecode_beh.csv", separator=',')
+beh_all = pl.read_csv('raw_behavioural_data.csv', separator=',')
 
 ## set constants for analysis
 freqs = np.geomspace(2, 35, 30)

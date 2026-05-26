@@ -1,3 +1,6 @@
+## Notes: This script analyses the raw behavioural data and produces the corresponding figures.
+## Input data can be found in "raw_behavioural_data.csv" at https://osf.io/2x3a8/files/osfstorage
+
 ## Load libraries
 library(tidyverse)
 library(data.table)
@@ -20,7 +23,7 @@ options(scipen=999)
 # path_data <- ""
 
 # Load behavioural data 
-dt <- fread('valDecode_beh.csv')
+dt <- fread('raw_behavioural_data.csv')
 
 ## Wrangle data
 dt[Response != 999, mean(Accuracy), by=Subject]

@@ -1,3 +1,9 @@
+## Notes: This script plots the results of the main effect RSA analysis, 
+## produced by the script "eeg_rsa_run.R", found at https://github.com/calebjordanstone/valDecode/tree/main/analysis 
+## Input data can be found in "rsa_results_files.zip".
+## This scipt also uses cleaned behavioural data files to find mean RTs for each phase. Cleaned
+## behavioural data files can be founr in "cleaned_beh_files.zip" at https://osf.io/2x3a8/files/osfstorage
+
 library(tidyverse)
 library(data.table)
 library(stringr)

@@ -1,3 +1,15 @@
+## Notes: This script runs cluster-based permutation testing to test for the significance 
+## of the interaction RDMs in three stages:
+## 1) Generate 10000 random RDMs and run the regression analysis per time point, per subject for each of these
+# random vectors. This stage of the analysis uses the decision function values produces by the 
+# script "eeg_mvpa.py", found at https://github.com/calebjordanstone/valDecode/tree/main/analysis. 
+# Input data can be found in "multiclass_decoding_results_files.zip" at https://osf.io/2x3a8/files/osfstorage. 
+# The 10000 randomly generated RDMs used in the manuscript can also be found on OSF as "random_vec_10000.csv". 
+# This first stage of the analysis produces an output file per subject, which can be found in "rsa_results_files.zip" on OSF.
+## 2) The second stage of the analysis runs the cluster-based permutation test. It uses 
+# the input files found in "rsa_results_files.zip" on OSF.
+## 3) The third stage of the analysis produces the figures. 
+
 library(tidyverse)
 library(data.table)
 library(stringr)
@@ -345,7 +357,7 @@ ggplot() +
   geom_vline(xintercept=159.75321, color='#17becf', linewidth=1)
 
 
-## plot interactions
+## plot interactions -----------------------------------------------------------------------------
 # average across subjects
 rslts_cue_rc_by_val_int_p <- rslts_cue_rc_by_val_int[!(subID %in% exclude), 
                                                      lapply(.SD, mean), by=c('time', 'tpoint'), 

@@ -1,3 +1,8 @@
+## Notes: This script takes results from the binary decoding analysis performed in the 
+# script "eeg_mvpa.py", found at https://github.com/calebjordanstone/valDecode/tree/main/analysis, 
+# and runs statistical analysis on those results and produces figures of the results. 
+## Input data can be found in "decode_by_value_results_files.zip" at https://osf.io/2x3a8/files/osfstorage
+
 library(tidyverse)
 library(data.table)
 library(stringr)

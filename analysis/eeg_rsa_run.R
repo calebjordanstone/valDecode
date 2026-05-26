@@ -1,3 +1,10 @@
+## Notes: This script takes as input the results of the multiclass decoding analysis performed in 
+# the script "eeg_mvpa.py", found at https://github.com/calebjordanstone/valDecode/tree/main/analysis, 
+# and runs the RSA analysis for the main effect and interaction RDMs. 
+## Input data can be found in "multiclass_decoding_results_files.zip" at https://osf.io/2x3a8/files/osfstorage
+## This script produces a separate output file for the main effect analysis and the interaction analysis, and is run once per phase.  
+## Output data can be found in "rsa_results_files.zip", found at https://osf.io/2x3a8/files/osfstorage
+
 library(tidyverse)
 library(data.table)
 library(stringr)
@@ -23,7 +30,7 @@ library(corrplot)
 # Load data 
 # Note: loads data files containing decision function values per subject per 
 # time point per trial for a given phase (reward/extinction). Change file names
-# here to get data from a different phase
+# here to get data from a different phase (rc = reward contingency, ex = extinction)
 files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_sub')
 data_dfun <- rbindlist(lapply(file.path(path_out, files_dfun), fread))
 
