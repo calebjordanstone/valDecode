@@ -74,24 +74,78 @@ vec_val <- c(1, 1, 1, 1, 0, 0, 0, 0,
              0, 0, 0, 0, 1, 1, 1, 1)
 mat_val <-matrix(vec_val, 8)
 
-# turn RDMs into contrast vectors
-vec_stim_con <- ifelse(vec_stim == 0, -1, 1)
-vec_resp_con <- ifelse(vec_resp == 0, -1, 1)
-vec_rule_con <- ifelse(vec_rule == 0, -1, 1)
-vec_val_con <- ifelse(vec_val == 0, -1, 1)
+## original ideas for interactions
+vec_stim_by_val <- c(1, 0, 1, 0, 0, 1, 0, 1,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     1, 0, 1, 0, 0, 1, 0, 1,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     1, 0, 1, 0, 0, 1, 0, 1,
+                     0, 1, 0, 1, 1, 0, 1, 0,
+                     1, 0, 1, 0, 0, 1, 0, 1)
 
-# create interaction vectors
-vec_stim_by_val <- vec_stim_con*vec_val_con
-vec_resp_by_val <- vec_resp_con*vec_val_con
-vec_rule_by_val <- vec_rule_con*vec_val_con
+vec_resp_by_val <- c(1, 0, 1, 0, 0, 1, 1, 0,
+                     0, 1, 0, 1, 1, 0, 0, 1,
+                     1, 0, 1, 0, 0, 1, 1, 0,
+                     0, 1, 0, 1, 1, 0, 0, 1,
+                     0, 1, 0, 1, 1, 0, 0, 1,
+                     1, 0, 1, 0, 0, 1, 1, 0,
+                     1, 0, 1, 0, 0, 1, 1, 0,
+                     0, 1, 0, 1, 1, 0, 0, 1)
 
-# put interaction into non-zero intercept format
-vec_stim_by_val <- ifelse(vec_stim_by_val == -1, 0, 1)
-vec_resp_by_val <- ifelse(vec_resp_by_val == -1, 0, 1)
-vec_rule_by_val <- ifelse(vec_rule_by_val == -1, 0, 1)
-mat_stim_by_val <- matrix(vec_stim_by_val, 8)
+vec_resp_by_val2 <- c(1, 0, 0, 1, 0, 1, 0, 1,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      1, 0, 0, 1, 0, 1, 0, 1,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      1, 0, 0, 1, 0, 1, 0, 1,
+                      0, 1, 1, 0, 1, 0, 1, 0,
+                      1, 0, 0, 1, 0, 1, 0, 1)
+
+vec_resp_by_val3 <- c(1, 0, 1, 0, 1, 0, 0, 1,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      1, 0, 1, 0, 1, 0, 0, 1,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      1, 0, 1, 0, 1, 0, 0, 1,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      0, 1, 0, 1, 0, 1, 1, 0,
+                      1, 0, 1, 0, 1, 0, 0, 1)
+
+vec_rule_by_val <- c(1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     0, 0, 0, 0, 1, 1, 0, 0,
+                     0, 0, 0, 0, 1, 1, 0, 0,
+                     1, 1, 1, 1, 0, 0, 1, 1,
+                     1, 1, 1, 1, 0, 0, 1, 1)
+
+vec_rule_by_val2 <- c(1, 1, 0, 0, 0, 0, 0, 0,
+                      1, 1, 0, 0, 0, 0, 0, 0,
+                      0, 0, 1, 1, 1, 1, 1, 1,
+                      0, 0, 1, 1, 1, 1, 1, 1,
+                      0, 0, 1, 1, 1, 1, 1, 1,
+                      0, 0, 1, 1, 1, 1, 1, 1,
+                      0, 0, 1, 1, 1, 1, 1, 1,
+                      0, 0, 1, 1, 1, 1, 1, 1)
+
+vec_rule_by_val3 <- c(1, 1, 1, 1, 1, 1, 0, 0,
+                      1, 1, 1, 1, 1, 1, 0, 0,
+                      1, 1, 1, 1, 1, 1, 0, 0,
+                      1, 1, 1, 1, 1, 1, 0, 0,
+                      1, 1, 1, 1, 1, 1, 0, 0,
+                      1, 1, 1, 1, 1, 1, 0, 0,
+                      0, 0, 0, 0, 0, 0, 1, 1,
+                      0, 0, 0, 0, 0, 0, 1, 1)
+
+# turn interaction vectors into matrices
+mat_stim_by_val <- matrix(vec_stim_by_val, 8) 
 mat_resp_by_val <- matrix(vec_resp_by_val, 8)
+mat_resp_by_val2 <- matrix(vec_resp_by_val2, 8)
+mat_resp_by_val3 <- matrix(vec_resp_by_val3, 8)
 mat_rule_by_val <- matrix(vec_rule_by_val, 8)
+mat_rule_by_val2 <- matrix(vec_rule_by_val2, 8)
+mat_rule_by_val3 <- matrix(vec_rule_by_val3, 8)
 
 ### Run analysis ---------------------------------------------------------------
 ## Cue-locked ------------------------------------------------------------------
@@ -172,6 +226,22 @@ for (sub in unique(data_dfun[, subID])) {
                        rep(mat_rule_by_val[, 6], times=repeats), # 610
                        rep(mat_rule_by_val[, 7], times=repeats), # 710
                        rep(mat_rule_by_val[, 8], times=repeats)) # 810
+  rule_by_val_vec2 <- c(rep(mat_rule_by_val2[, 1], times=repeats), # 110
+                        rep(mat_rule_by_val2[, 2], times=repeats), # 210
+                        rep(mat_rule_by_val2[, 3], times=repeats), # 310
+                        rep(mat_rule_by_val2[, 4], times=repeats), # 410
+                        rep(mat_rule_by_val2[, 5], times=repeats), # 510
+                        rep(mat_rule_by_val2[, 6], times=repeats), # 610
+                        rep(mat_rule_by_val2[, 7], times=repeats), # 710
+                        rep(mat_rule_by_val2[, 8], times=repeats)) # 810
+  rule_by_val_vec3 <- c(rep(mat_rule_by_val3[, 1], times=repeats), # 110
+                        rep(mat_rule_by_val3[, 2], times=repeats), # 210
+                        rep(mat_rule_by_val3[, 3], times=repeats), # 310
+                        rep(mat_rule_by_val3[, 4], times=repeats), # 410
+                        rep(mat_rule_by_val3[, 5], times=repeats), # 510
+                        rep(mat_rule_by_val3[, 6], times=repeats), # 610
+                        rep(mat_rule_by_val3[, 7], times=repeats), # 710
+                        rep(mat_rule_by_val3[, 8], times=repeats)) # 810
   stim_by_val_vec <- c(rep(mat_stim_by_val[, 1], times=repeats), # 110
                        rep(mat_stim_by_val[, 2], times=repeats), # 210
                        rep(mat_stim_by_val[, 3], times=repeats), # 310
@@ -188,6 +258,22 @@ for (sub in unique(data_dfun[, subID])) {
                        rep(mat_resp_by_val[, 6], times=repeats), # 610
                        rep(mat_resp_by_val[, 7], times=repeats), # 710
                        rep(mat_resp_by_val[, 8], times=repeats)) # 810
+  resp_by_val_vec2 <- c(rep(mat_resp_by_val2[, 1], times=repeats), # 110
+                        rep(mat_resp_by_val2[, 2], times=repeats), # 210
+                        rep(mat_resp_by_val2[, 3], times=repeats), # 310
+                        rep(mat_resp_by_val2[, 4], times=repeats), # 410
+                        rep(mat_resp_by_val2[, 5], times=repeats), # 510
+                        rep(mat_resp_by_val2[, 6], times=repeats), # 610
+                        rep(mat_resp_by_val2[, 7], times=repeats), # 710
+                        rep(mat_resp_by_val2[, 8], times=repeats)) # 810
+  resp_by_val_vec3 <- c(rep(mat_resp_by_val3[, 1], times=repeats), # 110
+                        rep(mat_resp_by_val3[, 2], times=repeats), # 210
+                        rep(mat_resp_by_val3[, 3], times=repeats), # 310
+                        rep(mat_resp_by_val3[, 4], times=repeats), # 410
+                        rep(mat_resp_by_val3[, 5], times=repeats), # 510
+                        rep(mat_resp_by_val3[, 6], times=repeats), # 610
+                        rep(mat_resp_by_val3[, 7], times=repeats), # 710
+                        rep(mat_resp_by_val3[, 8], times=repeats)) # 810
   # add vectors to data table
   data_dfun_long[, ':=' (rule = rule_vec,
                          stim = stim_vec,
@@ -195,8 +281,13 @@ for (sub in unique(data_dfun[, subID])) {
                          val = val_vec,
                          conj = ifelse(y==class, 1, 0),
                          rule_by_val = rule_by_val_vec,
+                         rule_by_val2 = rule_by_val_vec2,
+                         rule_by_val3 = rule_by_val_vec3,
                          stim_by_val = stim_by_val_vec,
-                         resp_by_val = resp_by_val_vec)]
+                         resp_by_val = resp_by_val_vec,
+                         resp_by_val2 = resp_by_val_vec2,
+                         resp_by_val3 = resp_by_val_vec3
+                         )]
   
   # make sure everything is ordered properly
   setorder(data_dfun_long, trial_by_tpoint, class)
@@ -239,9 +330,19 @@ for (sub in unique(data_dfun[, subID])) {
     # compute model
     mdl_rule_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, rule_by_val)],
                         y=data_dfun_t[, dfun])
+    mdl_rule_t2 <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, rule_by_val2)],
+                        y=data_dfun_t[, dfun])
+    mdl_rule_t3 <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, rule_by_val3)],
+                        y=data_dfun_t[, dfun])
+    
     mdl_stim_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, stim_by_val)], 
                         y=data_dfun_t[, dfun])
+    
     mdl_resp_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, resp_by_val)], 
+                        y=data_dfun_t[, dfun])
+    mdl_resp_t2 <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, resp_by_val2)], 
+                        y=data_dfun_t[, dfun])
+    mdl_resp_t3 <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, resp_by_val3)], 
                         y=data_dfun_t[, dfun])
 
     # add betas to data table
@@ -257,6 +358,23 @@ for (sub in unique(data_dfun[, subID])) {
       rule_val= mdl_rule_t$coefficients['val'],
       rule_conj = mdl_rule_t$coefficients['conj'],
       rule_by_val = mdl_rule_t$coefficients['rule_by_val'],
+      
+      rule_int2 = mdl_rule_t2$coefficients['Intercept'],
+      rule_rule2 = mdl_rule_t2$coefficients['rule'],
+      rule_stim2 = mdl_rule_t2$coefficients['stim'],
+      rule_resp2 = mdl_rule_t2$coefficients['resp'],
+      rule_val2= mdl_rule_t2$coefficients['val'],
+      rule_conj2 = mdl_rule_t2$coefficients['conj'],
+      rule_by_val2 = mdl_rule_t2$coefficients['rule_by_val2'],
+      
+      rule_int3 = mdl_rule_t3$coefficients['Intercept'],
+      rule_rule3 = mdl_rule_t3$coefficients['rule'],
+      rule_stim3 = mdl_rule_t3$coefficients['stim'],
+      rule_resp3 = mdl_rule_t3$coefficients['resp'],
+      rule_val3= mdl_rule_t3$coefficients['val'],
+      rule_conj3 = mdl_rule_t3$coefficients['conj'],
+      rule_by_val3 = mdl_rule_t3$coefficients['rule_by_val3'],
+      
       # stim
       stim_int = mdl_stim_t$coefficients['Intercept'],
       stim_rule = mdl_stim_t$coefficients['rule'],
@@ -265,6 +383,7 @@ for (sub in unique(data_dfun[, subID])) {
       stim_val = mdl_stim_t$coefficients['val'],
       stim_conj = mdl_stim_t$coefficients['conj'],
       stim_by_val = mdl_stim_t$coefficients['stim_by_val'],
+      
       # resp
       resp_int = mdl_resp_t$coefficients['Intercept'],
       resp_rule = mdl_resp_t$coefficients['rule'],
@@ -272,7 +391,23 @@ for (sub in unique(data_dfun[, subID])) {
       resp_resp = mdl_resp_t$coefficients['resp'],
       resp_val = mdl_resp_t$coefficients['val'],
       resp_conj = mdl_resp_t$coefficients['conj'],
-      resp_by_val = mdl_resp_t$coefficients['resp_by_val']
+      resp_by_val = mdl_resp_t$coefficients['resp_by_val'],
+      
+      resp_int2 = mdl_resp_t2$coefficients['Intercept'],
+      resp_rule2 = mdl_resp_t2$coefficients['rule'],
+      resp_stim2 = mdl_resp_t2$coefficients['stim'],
+      resp_resp2 = mdl_resp_t2$coefficients['resp'],
+      resp_val2 = mdl_resp_t2$coefficients['val'],
+      resp_conj2 = mdl_resp_t2$coefficients['conj'],
+      resp_by_val2 = mdl_resp_t2$coefficients['resp_by_val2'],
+      
+      resp_int3 = mdl_resp_t3$coefficients['Intercept'],
+      resp_rule3 = mdl_resp_t3$coefficients['rule'],
+      resp_stim3 = mdl_resp_t3$coefficients['stim'],
+      resp_resp3 = mdl_resp_t3$coefficients['resp'],
+      resp_val3 = mdl_resp_t3$coefficients['val'],
+      resp_conj3 = mdl_resp_t3$coefficients['conj'],
+      resp_by_val3 = mdl_resp_t3$coefficients['resp_by_val3']
     )
 
     # append data from current time point to overall data table
