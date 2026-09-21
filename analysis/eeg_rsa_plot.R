@@ -2,7 +2,10 @@
 ## produced by the script "eeg_rsa_run.R", found at https://github.com/calebjordanstone/valDecode/tree/main/analysis 
 ## Input data can be found in "rsa_results_files.zip".
 ## This scipt also uses cleaned behavioural data files to find mean RTs for each phase. Cleaned
-## behavioural data files can be founr in "cleaned_beh_files.zip" at https://osf.io/2x3a8/files/osfstorage
+## behavioural data files can be found in "cleaned_beh_files.zip" at https://osf.io/2x3a8/files/osfstorage
+## Note that for the "rc" phase, there are 3 versions of the cleaned behavioural data files - the original version, 
+## and two versions with trial dropped to equate the trial numbers with the "ex" phase (one with trials dropped randomly
+## and another with trials dropped from the beginning)
 
 library(tidyverse)
 library(data.table)
@@ -40,13 +43,13 @@ ts <- seq(-0.1, 1, length.out=n_tpoints)
 exclude <- c('sub-12') 
 
 ## load EEG data
-rslts_cue_rc_all <- fread(paste0(path_out, 'rslts_cue_rc.csv'))
-rslts_cue_rc_by_val_int <- fread(paste0(path_out, 'rslts_cue_rc_by_val_int.csv'))
-rslts_cue_ex_all <- fread(paste0(path_out, 'rslts_cue_ex.csv'))
-rslts_cue_ex_by_val_int <- fread(paste0(path_out, 'rslts_cue_ex_by_val_int.csv'))
+rslts_cue_rc_all <- fread(paste0(path_out, 'rslts_cue_rc_tvals.csv'))
+rslts_cue_rc_by_val_int <- fread(paste0(path_out, 'rslts_cue_rc_by_val_int_tvals.csv'))
+rslts_cue_ex_all <- fread(paste0(path_out, 'rslts_cue_ex_tvals.csv'))
+rslts_cue_ex_by_val_int <- fread(paste0(path_out, 'rslts_cue_ex_by_val_int_tvals.csv'))
 
 # load behavioural data
-files_beh_rc <- list.files(path_out, pattern = 'beh_rc_sub', recursive = F)
+files_beh_rc <- list.files(path_out, pattern = 'beh_rc_sub', recursive = T)
 files_beh_ex <- list.files(path_out, pattern = 'beh_ex_sub', recursive = F)
 dt_rc <- rbindlist(lapply(file.path(path_out, files_beh_rc), fread))
 dt_rc <- dt_rc[!(Subject %in% exclude), ]
@@ -54,8 +57,12 @@ dt_ex <- rbindlist(lapply(file.path(path_out, files_beh_ex), fread))
 dt_ex <- dt_ex[!(Subject %in% exclude), ]
 
 # find mean RT per phase
-gavRT_rc <- dt_rc[, .(avRT = mean(RT)), by=Subject][, .(gavRT=mean(avRT))]
-gavRT_ex <- dt_ex[, .(avRT = mean(RT)), by=Subject][, .(gavRT=mean(avRT))]
+gavRT_rc <- dt_rc[, .(avRT = mean(RT)), by=Subject
+                  ][, .(gavRT=mean(avRT), 
+                        sdRT=sd(avRT))]
+gavRT_ex <- dt_ex[, .(avRT = mean(RT)), by=Subject
+                  ][, .(gavRT=mean(avRT),
+                        sdRT=sd(avRT))]
 
 ## Plot reward phase -----------------------------------------------------------
 # apply t-test function
@@ -79,12 +86,13 @@ rslts_cue_rc_all_pval$time <- rep(ts, times=5)
 
 # add significance lines for plotting
 rslts_cue_rc_all_pval[, sigLine := case_when(
-  effect == 'rule' & pval < .05 ~ -0.10,
-  effect == 'stim' & pval < .05 ~ -0.12,
-  effect == 'resp' & pval < .05 ~ -0.14,
-  effect == 'val' & pval < .05 ~ -0.16,
-  effect == 'conj' & pval < .05 ~ -0.18
+  effect == 'rule' & pval < .05 ~ -0.5, #-0.10,
+  effect == 'stim' & pval < .05 ~ -0.75, #-0.12,
+  effect == 'resp' & pval < .05 ~ -1, #-0.14,
+  effect == 'val' & pval < .05 ~ -1.25, #-0.16,
+  effect == 'conj' & pval < .05 ~ -1.5 #-0.18
 )]
+
 rslts_cue_rc_all_pval <- dcast(rslts_cue_rc_all_pval, time ~ effect, value.var = 'sigLine')
 
 # average over subjects
@@ -98,13 +106,21 @@ rslts_cue_rc_all_p <- rslts_cue_rc_all_p[rslts_cue_rc_all_pval,
 plot_cue_rc <- ggplot(rslts_cue_rc_all_p, aes(x=time)) + 
   
   # add reference lines
-  geom_line(data=data.frame(x=c(0, 0), y=c(-0.15, 0.15)), 
+  # geom_line(data=data.frame(x=c(0, 0), y=c(-0.15, 0.15)), 
+  #           aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  # geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-0.15, 0.15)), 
+  #           aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  geom_line(data=data.frame(x=c(0, 0), y=c(-2, 2)), 
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
-  geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-0.15, 0.15)), 
+  geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-2, 2)), 
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  
   geom_line(data=data.frame(x=c(-0.1, 1), y=c(0, 0)), 
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
   # add mean RT data lines
+  geom_pointrange(data=data.frame(x=0.909779, y=0), # 0.909 = gavRT_rc + 0.5 s
+             aes(x, y, xmin=x-.0615, xmax=x+.0615)) +
+  
   geom_point(data=data.frame(x=0.909779, y=0), # 0.909 = gavRT_rc + 0.5 s
             aes(x, y),
             fill='white',
@@ -113,6 +129,8 @@ plot_cue_rc <- ggplot(rslts_cue_rc_all_p, aes(x=time)) +
             stroke=1.25,
             shape=23,
             color='black') +
+  
+
   # add data
   geom_line(aes(y=stim, color='stimulus'), linewidth=1) +
   geom_line(aes(y=resp, color='response'), linewidth=1) +
@@ -126,9 +144,13 @@ plot_cue_rc <- ggplot(rslts_cue_rc_all_p, aes(x=time)) +
   geom_line(aes(y=i.val, color='value'), linewidth=1) +
   
   # customise
-  scale_y_continuous(name='Beta',
-                     breaks=c(-0.2, 0, 0.2),
-                     labels=c('-0.2', '0.0', '0.2'),
+  # scale_y_continuous(name='Beta',
+  #                    breaks=c(-0.2, 0, 0.2),
+  #                    labels=c('-0.2', '0.0', '0.2'),
+  #                    expand=expansion(mult = 0.1)) +
+  scale_y_continuous(name='t',
+                     breaks=c(-2, 0, 2, 4, 6),
+                     labels=c('-2', '0', '2', '4', '6'),
                      expand=expansion(mult = 0.1)) +
   scale_x_continuous(name='Time from rule onset (s)',
                      breaks=c(0, 0.3, 0.6, 0.9),
@@ -142,12 +164,14 @@ plot_cue_rc <- ggplot(rslts_cue_rc_all_p, aes(x=time)) +
                               'conjunction'  = 'black',
                               'int' = 'green'),
                      labels=c('rule', 'stimulus', 'response', 'value', 'conjunction', 'int')) +
-  geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-0.2, 0.2)),
+  # geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-0.2, 0.2)),
+  #                 aes(x, y), size=1, color='black') +
+  geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-2, 6)),
                   aes(x, y), size=1, color='black') +
   my_theme() + theme(legend.position = 'top')
 
 # save plot
-svg(paste0(path_out, 'fig_cue_rc.svg'),
+svg(paste0(path_out, 'fig_cue_rc_tvals_with_ex_trial_counts_dropped_from_start.svg'),
     width=8, height=4)
 plot(plot_cue_rc)
 dev.off()
@@ -174,11 +198,11 @@ rslts_cue_ex_all_pval$time <- rep(ts, times=5)
 
 # add significance lines for plotting
 rslts_cue_ex_all_pval[, sigLine := case_when(
-  effect == 'rule' & pval < .05 ~ -0.10,
-  effect == 'stim' & pval < .05 ~ -0.12,
-  effect == 'resp' & pval < .05 ~ -0.14,
-  effect == 'val' & pval < .05 ~ -0.16,
-  effect == 'conj' & pval < .05 ~ -0.18 #rt
+  effect == 'rule' & pval < .05 ~ -0.5, #-0.10,
+  effect == 'stim' & pval < .05 ~ -0.75, #-0.12,
+  effect == 'resp' & pval < .05 ~ -1, #-0.14,
+  effect == 'val' & pval < .05 ~ -1.25, #-0.16,
+  effect == 'conj' & pval < .05 ~ -1.5 #-0.18
 )]
 rslts_cue_ex_all_pval <- dcast(rslts_cue_ex_all_pval, time ~ effect, value.var = 'sigLine')
 
@@ -195,14 +219,22 @@ rslts_cue_ex_all_p <- rslts_cue_ex_all_p[rslts_cue_ex_all_pval,
 plot_cue_ex <- ggplot(rslts_cue_ex_all_p, aes(x=time)) + 
   
   # add reference lines
-  geom_line(data=data.frame(x=c(0, 0), y=c(-0.15, 0.15)), 
+  # geom_line(data=data.frame(x=c(0, 0), y=c(-0.15, 0.15)), 
+  #           aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  # geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-0.15, 0.15)), 
+  #           aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  geom_line(data=data.frame(x=c(0, 0), y=c(-2, 2)), 
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
-  geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-0.15, 0.15)), 
+  geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-2, 2)), 
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
+  
   geom_line(data=data.frame(x=c(-0.1, 1), y=c(0, 0)), 
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
   
   # add mean RT data lines
+  geom_pointrange(data=data.frame(x=0.8980177, y=0), # 0.909 = gavRT_rc + 0.5 s
+                  aes(x, y, xmin=x-.0657, xmax=x+.0657)) +
+  
   geom_point(data=data.frame(x=0.8980177, y=0), # 0.898 = gavRT_ex + 0.5 s
              aes(x, y),
              fill='white',
@@ -225,9 +257,13 @@ plot_cue_ex <- ggplot(rslts_cue_ex_all_p, aes(x=time)) +
   geom_line(aes(y=i.val, color='value'), linewidth=1) +
 
   # customise
-  scale_y_continuous(name='Beta',
-                     breaks=c(-0.2, 0, 0.2),
-                     labels=c('-0.2', '0.0', '0.2'),
+  # scale_y_continuous(name='Beta',
+  #                    breaks=c(-0.2, 0, 0.2),
+  #                    labels=c('-0.2', '0.0', '0.2'),
+  #                    expand=expansion(mult = 0.1)) +
+  scale_y_continuous(name='t',
+                     breaks=c(-2, 0, 2, 4, 6),
+                     labels=c('-2', '0', '2', '4', '6'),
                      expand=expansion(mult = 0.1)) +
   scale_x_continuous(name='Time from rule onset (s)',
                      breaks=c(0, 0.3, 0.6, 0.9),
@@ -240,7 +276,9 @@ plot_cue_ex <- ggplot(rslts_cue_ex_all_p, aes(x=time)) +
                               'value' = '#ff7f0e',
                               'conjunction'  = 'black'),
                      labels=c('rule', 'stimulus', 'response', 'value', 'conjunction')) +
-  geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-0.2, 0.2)),
+  # geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-0.2, 0.2)),
+  #                 aes(x, y), size=1, color='black') +
+  geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-2, 6)),
                   aes(x, y), size=1, color='black') +
   my_theme() + theme(legend.position = 'top')
 

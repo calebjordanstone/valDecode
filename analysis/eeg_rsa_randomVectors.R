@@ -37,7 +37,8 @@ source(file.path("my_theme.R"))
 # Note: loads data files containing decision function values per subject per 
 # time point per trial for a given phase (reward/extinction). Change file names
 # here to get data from a different phase
-files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_sub') 
+#files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_sub', recursive=T) 
+files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_sub-(..)\\.csv', recursive=T) 
 data_dfun <- rbindlist(lapply(file.path(path_out, files_dfun), fread))
 
 # define full model RDMs
@@ -106,8 +107,8 @@ while (n < n_iter) {
 }
 # # save random vectors
 dt <- data.table(do.call(cbind, cols))
-write_csv(dt, paste0(path_out, 'random_vec_10000.csv'))
-#dt <- fread(paste0(path_out, 'random_vec_10000.csv')) # load the random vectors used in the paper
+#write_csv(dt, paste0(path_out, 'random_vec_10000.csv'))
+dt <- fread(paste0(path_out, 'random_vec_10000.csv')) # load the random vectors used in the paper
 
 # Loop through participants
 # Note that this part of the script takes a very long time to run
@@ -238,16 +239,28 @@ for (sub in unique(data_dfun[, subID])) {
       data_dfun_t <- data_dfun_long[tpoint == t, ]
       
       # compute model
-      mdl_t <- lsfit(x=data_dfun_t[, .(stim, resp, rule, val, conj, rand)],
-                     y=data_dfun_t[, dfun])
+      # mdl_t <- lsfit(x=data_dfun_t[, .(stim, resp, rule, val, conj, rand)],
+      #                y=data_dfun_t[, dfun])
+      
       
       # add betas to data table
+      # rslts_t <- data.table(
+      #   rand_vect = rand_vect_no,
+      #   subID = sub,
+      #   tpoint=t,
+      #   time = ts[t+1],
+      #   rand = mdl_t$coefficients['rand'])
+      
+      ## re-run model to extract t-values instead of beta values
+      mdl_t <- lm(dfun ~ rule + stim + resp + val + conj + rand, data=data_dfun_t)
+      
       rslts_t <- data.table(
-        rand_vect = rand_vect_no,
-        subID = sub,
-        tpoint=t,
-        time = ts[t+1],
-        rand = mdl_t$coefficients['rand'])
+          rand_vect = rand_vect_no,
+          subID = sub,
+          tpoint=t,
+          time = ts[t+1],
+          rand = coef(summary(mdl_t))['rand', 't value']
+          )
       
       # append data from current time point to overall data table
       set(rslts_all, 
@@ -261,7 +274,7 @@ for (sub in unique(data_dfun[, subID])) {
   # close the progress bar
   close(pb) 
   # save
-  write_csv(rslts_all, paste0(path_out, 'rslts_cue_rc_random_vectors_10000_', sub, '.csv'))
+  write_csv(rslts_all, paste0(path_out, 'rslts_cue_rc_random_vectors_10000_', sub, '_tvals.csv'))
 }
 
 ## Run cluster-based permutation test ------------------------------------------
@@ -336,15 +349,25 @@ permutation_distribution_abs <- rslts_cue_rc_random_vectors_t[,
 permutation_distribution_abs <- permutation_distribution_abs[order(-max_cluster_val)][, index := seq(1, .N)]
 
 # get p-values based on the cluster-based permutation testing
-# reward phase
-(sum(permutation_distribution_abs$max_cluster_val > 32.07802)/10000) # rule_by_val interaction
-(sum(permutation_distribution_abs$max_cluster_val > 87.66451)/10000) # resp_by_val interaction
-(sum(permutation_distribution_abs$max_cluster_val > 159.75321)/10000) # stim_by_val interaction,
+# reward phase - beta values
+# (sum(permutation_distribution_abs$max_cluster_val > 32.07802)/10000) # rule_by_val interaction
+# (sum(permutation_distribution_abs$max_cluster_val > 87.66451)/10000) # resp_by_val interaction
+# (sum(permutation_distribution_abs$max_cluster_val > 159.75321)/10000) # stim_by_val interaction
 
-# extinction phase
-(sum(permutation_distribution_abs$max_cluster_val > 40.49683)/10000) # rule_by_val interaction
-(sum(permutation_distribution_abs$max_cluster_val > 37.78144)/10000) # resp_by_val interaction
-(sum(permutation_distribution_abs$max_cluster_val > 46.84464)/10000) # stim_by_val interaction,
+# reward phase, t-values
+(sum(permutation_distribution_abs$max_cluster_val > 35.344022)/10000) # rule_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 115.97604)/10000) # resp_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 160.95055)/10000) # stim_by_val interaction
+
+# extinction phase - beta values
+# (sum(permutation_distribution_abs$max_cluster_val > 40.49683)/10000) # rule_by_val interaction
+# (sum(permutation_distribution_abs$max_cluster_val > 37.78144)/10000) # resp_by_val interaction
+# (sum(permutation_distribution_abs$max_cluster_val > 46.84464)/10000) # stim_by_val interaction
+
+# extinction phase, t-values
+(sum(permutation_distribution_abs$max_cluster_val > 13.14759)/10000) # rule_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 33.03375)/10000) # resp_by_val interaction
+(sum(permutation_distribution_abs$max_cluster_val > 44.41236)/10000) # stim_by_val interaction
 
 
 # plot absolute permutation distribution
@@ -352,9 +375,9 @@ ggplot() +
   geom_histogram(data=permutation_distribution_abs, 
                  aes(x=max_cluster_val),
                  bins=25) + 
-  geom_vline(xintercept=32.07802, color='#9467bd', linewidth=1) + 
-  geom_vline(xintercept=87.66451, color='#e377c2', linewidth=1) + 
-  geom_vline(xintercept=159.75321, color='#17becf', linewidth=1)
+  geom_vline(xintercept=13.14759, color='#9467bd', linewidth=1) + 
+  geom_vline(xintercept=33.03375, color='#e377c2', linewidth=1) + 
+  geom_vline(xintercept=44.41236, color='#17becf', linewidth=1)
 
 
 ## plot interactions -----------------------------------------------------------------------------
@@ -372,15 +395,15 @@ rslts_cue_rc_by_val_int_se <- rslts_cue_rc_by_val_int[!(subID %in% exclude),
                                                       lapply(.SD, std_err), by=c('time'), 
                                                       .SDcols=rule_int:resp_by_val]
 # add significance line
-rslts_cue_rc_by_val_int_p[, ':=' (resp_by_val_cluster = ifelse((tpoint > 202 & tpoint < 232), -0.07, NA),
-                                  stim_by_val_cluster = ifelse((tpoint > 188 & tpoint < 231), -0.08, NA))]
+rslts_cue_rc_by_val_int_p[, ':=' (resp_by_val_cluster = ifelse(tpoint > 246, -0.4, NA),
+                                  stim_by_val_cluster = ifelse((tpoint > 188 & tpoint < 231), -0.5, NA))]
 
 plot_cue_rc_by_val_int <- ggplot() + 
   
   # add reference lines
-  geom_line(data=data.frame(x=c(0, 0), y=c(-0.075, 0.075)),
+  geom_line(data=data.frame(x=c(0, 0), y=c(-0.3, 0.3)),
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
-  geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-0.075, 0.075)),
+  geom_line(data=data.frame(x=c(0.5, 0.5), y=c(-0.3, 0.3)),
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
   geom_line(data=data.frame(x=c(-0.1, 1), y=c(0, 0)),
             aes(x, y), linetype = 3, linewidth=0.8, alpha = 0.4) +
@@ -389,59 +412,59 @@ plot_cue_rc_by_val_int <- ggplot() +
             aes(x=time, y=rule_by_val), color='#9467bd',
             linewidth=1,
             linetype=1) +
-  geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
-                  y=rslts_cue_rc_by_val_int_p$rule_by_val,
-                  ymin=rslts_cue_rc_by_val_int_p$rule_by_val - rslts_cue_rc_by_val_int_se$rule_by_val,
-                  ymax=rslts_cue_rc_by_val_int_p$rule_by_val + rslts_cue_rc_by_val_int_se$rule_by_val),
-              fill='#9467bd',
-              alpha=0.2,
-              color=NA) +
+  # geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
+  #                 y=rslts_cue_rc_by_val_int_p$rule_by_val,
+  #                 ymin=rslts_cue_rc_by_val_int_p$rule_by_val - rslts_cue_rc_by_val_int_se$rule_by_val,
+  #                 ymax=rslts_cue_rc_by_val_int_p$rule_by_val + rslts_cue_rc_by_val_int_se$rule_by_val),
+  #             fill='#9467bd',
+  #             alpha=0.2,
+  #             color=NA) +
   geom_line(data=rslts_cue_rc_by_val_int_p,
             aes(x=time, y=stim_by_val), color='#17becf',
             linewidth=1,
             linetype=1) +
-  geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
-                  y=rslts_cue_rc_by_val_int_p$stim_by_val,
-                  ymin=rslts_cue_rc_by_val_int_p$stim_by_val - rslts_cue_rc_by_val_int_se$stim_by_val,
-                  ymax=rslts_cue_rc_by_val_int_p$stim_by_val + rslts_cue_rc_by_val_int_se$stim_by_val),
-              fill='#17becf',
-              alpha=0.2,
-              color=NA) +
+  # geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
+  #                 y=rslts_cue_rc_by_val_int_p$stim_by_val,
+  #                 ymin=rslts_cue_rc_by_val_int_p$stim_by_val - rslts_cue_rc_by_val_int_se$stim_by_val,
+  #                 ymax=rslts_cue_rc_by_val_int_p$stim_by_val + rslts_cue_rc_by_val_int_se$stim_by_val),
+  #             fill='#17becf',
+  #             alpha=0.2,
+  #             color=NA) +
   geom_line(data=rslts_cue_rc_by_val_int_p,
             aes(x=time, y=resp_by_val), color='#e377c2',
             linewidth=1,
             linetype=1) +
-  geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
-                  y=rslts_cue_rc_by_val_int_p$resp_by_val,
-                  ymin=rslts_cue_rc_by_val_int_p$resp_by_val - rslts_cue_rc_by_val_int_se$resp_by_val,
-                  ymax=rslts_cue_rc_by_val_int_p$resp_by_val + rslts_cue_rc_by_val_int_se$resp_by_val),
-              fill='#e377c2',
-              alpha=0.2,
-              color=NA) +
+  # geom_ribbon(aes(x=rslts_cue_rc_by_val_int_p$time,
+  #                 y=rslts_cue_rc_by_val_int_p$resp_by_val,
+  #                 ymin=rslts_cue_rc_by_val_int_p$resp_by_val - rslts_cue_rc_by_val_int_se$resp_by_val,
+  #                 ymax=rslts_cue_rc_by_val_int_p$resp_by_val + rslts_cue_rc_by_val_int_se$resp_by_val),
+  #             fill='#e377c2',
+  #             alpha=0.2,
+  #             color=NA) +
   # add significance line
-  geom_line(data=rslts_cue_rc_by_val_int_p,
-            aes(x=time, y=stim_by_val_cluster), color='#17becf',
-            linewidth=2,
-            linetype=1) +
-  geom_line(data=rslts_cue_rc_by_val_int_p,
-            aes(x=time, y=resp_by_val_cluster), color='#e377c2',
-            linewidth=2,
-            linetype=1) +
+  # geom_line(data=rslts_cue_rc_by_val_int_p,
+  #           aes(x=time, y=stim_by_val_cluster), color='#17becf',
+  #           linewidth=2,
+  #           linetype=1) +
+  # geom_line(data=rslts_cue_rc_by_val_int_p,
+  #           aes(x=time, y=resp_by_val_cluster), color='#e377c2',
+  #           linewidth=2,
+  #           linetype=1) +
 
   # customise
-  scale_y_continuous(name='Beta',
-                     breaks=c(-0.1, 0, 0.1),
-                     labels=c('-0.1', '0.0', '0.1'),
+  scale_y_continuous(name='t',
+                     breaks=c(-0.5, 0, 0.5, 1.0),
+                     labels=c('-0.5', '0.0', '0.5', '1.0'),
                      # limits=c(0.375, 1),
                      expand=expansion(mult = 0.1)) +
   scale_x_continuous(name='Time from rule onset (s)',
                      breaks=c(0, 0.3, 0.6, 0.9),
                      labels=c('0.0', '0.3', '0.6', '0.9')) +
-  geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-0.1, 0.1)),
+  geom_rangeframe(data=data.frame(x=c(0, 0.9), y=c(-0.5, 1.0)),
                   aes(x, y), size=1, color='black') +
   my_theme() + theme(legend.position = 'top')
 
-svg(paste0(path_out, 'fig_cue_rc_permutations.svg'),
+svg(paste0(path_out, 'fig_cue_rc_permutations_tvals.svg'),
     width=8, height=4)
 plot(plot_cue_rc_by_val_int)
 dev.off()

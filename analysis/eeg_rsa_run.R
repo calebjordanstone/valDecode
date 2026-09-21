@@ -31,7 +31,8 @@ library(corrplot)
 # Note: loads data files containing decision function values per subject per 
 # time point per trial for a given phase (reward/extinction). Change file names
 # here to get data from a different phase (rc = reward contingency, ex = extinction)
-files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_sub')
+files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc_sub', recursive=T)
+#files_dfun <- list.files(path_out, pattern = 'dfun_cue_rc(.)*ex_trial_counts_dropped_from_start', recursive=T)
 data_dfun <- rbindlist(lapply(file.path(path_out, files_dfun), fread))
 
 ### Define RDMs ----------------------------------------------------------------
@@ -210,7 +211,7 @@ for (sub in unique(data_dfun[, subID])) {
                          conj = ifelse(y==class, 1, 0),
                          rule_by_val = rule_by_val_vec,
                          stim_by_val = stim_by_val_vec,
-                         resp_by_val = resp_by_val_vec,
+                         resp_by_val = resp_by_val_vec
                          )]
   
   # make sure everything is ordered properly
@@ -225,22 +226,37 @@ for (sub in unique(data_dfun[, subID])) {
     data_dfun_t <- data_dfun_long[tpoint == t, ]
 
     # compute model
-    mdl_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj)], 
-                   y=data_dfun_t[, dfun])
-
+    # mdl_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj)], 
+    #                y=data_dfun_t[, dfun])
+    # 
     # add betas to data table
+    # rslts_t <- data.table(
+    #   subID = sub,
+    #   tpoint=t,
+    #   time = ts[t+1],
+    #   int = mdl_t$coefficients['Intercept'],
+    #   rule = mdl_t$coefficients['rule'],
+    #   stim = mdl_t$coefficients['stim'],
+    #   resp = mdl_t$coefficients['resp'],
+    #   val = mdl_t$coefficients['val'],
+    #   conj = mdl_t$coefficients['conj']
+    # )
+    
+    ## re-run model to extract t-values instead of beta values
+    mdl_t <- lm(dfun ~ rule + stim + resp + val + conj, data=data_dfun_t)
+    
     rslts_t <- data.table(
       subID = sub,
       tpoint=t,
       time = ts[t+1],
-      int = mdl_t$coefficients['Intercept'],
-      rule = mdl_t$coefficients['rule'],
-      stim = mdl_t$coefficients['stim'],
-      resp = mdl_t$coefficients['resp'],
-      val = mdl_t$coefficients['val'],
-      conj = mdl_t$coefficients['conj']
+      int = coef(summary(mdl_t))['(Intercept)', 't value'],
+      rule = coef(summary(mdl_t))['rule', 't value'],
+      stim = coef(summary(mdl_t))['stim', 't value'],
+      resp = coef(summary(mdl_t))['resp', 't value'],
+      val = coef(summary(mdl_t))['val', 't value'],
+      conj = coef(summary(mdl_t))['conj', 't value']
     )
-
+    
     # append data from current time point to overall data table
     rslts_cue_rc <- rbind(rslts_cue_rc, rslts_t)
   }
@@ -252,52 +268,91 @@ for (sub in unique(data_dfun[, subID])) {
     data_dfun_t <- data_dfun_long[tpoint==t, ]
 
     # compute model
-    mdl_rule_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, rule_by_val)],
-                        y=data_dfun_t[, dfun])
-    mdl_stim_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, stim_by_val)], 
-                        y=data_dfun_t[, dfun])
-    mdl_resp_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, resp_by_val)], 
-                        y=data_dfun_t[, dfun])
+    # mdl_rule_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, rule_by_val)],
+    #                     y=data_dfun_t[, dfun])
+    # mdl_stim_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, stim_by_val)], 
+    #                     y=data_dfun_t[, dfun])
+    # mdl_resp_t <- lsfit(x=data_dfun_t[, .(rule, stim, resp, val, conj, resp_by_val)], 
+    #                     y=data_dfun_t[, dfun])
 
+    # add betas to data table
+    # rslts_t <- data.table(
+    #   subID = sub,
+    #   tpoint=t,
+    #   time = ts[t+1],
+    #   # rule
+    #   rule_int = mdl_rule_t$coefficients['Intercept'],
+    #   rule_rule = mdl_rule_t$coefficients['rule'],
+    #   rule_stim = mdl_rule_t$coefficients['stim'],
+    #   rule_resp = mdl_rule_t$coefficients['resp'],
+    #   rule_val= mdl_rule_t$coefficients['val'],
+    #   rule_conj = mdl_rule_t$coefficients['conj'],
+    #   rule_by_val = mdl_rule_t$coefficients['rule_by_val'],
+    #   
+    #   # stim
+    #   stim_int = mdl_stim_t$coefficients['Intercept'],
+    #   stim_rule = mdl_stim_t$coefficients['rule'],
+    #   stim_stim = mdl_stim_t$coefficients['stim'],
+    #   stim_resp = mdl_stim_t$coefficients['resp'],
+    #   stim_val = mdl_stim_t$coefficients['val'],
+    #   stim_conj = mdl_stim_t$coefficients['conj'],
+    #   stim_by_val = mdl_stim_t$coefficients['stim_by_val'],
+    #   
+    #   # resp
+    #   resp_int = mdl_resp_t$coefficients['Intercept'],
+    #   resp_rule = mdl_resp_t$coefficients['rule'],
+    #   resp_stim = mdl_resp_t$coefficients['stim'],
+    #   resp_resp = mdl_resp_t$coefficients['resp'],
+    #   resp_val = mdl_resp_t$coefficients['val'],
+    #   resp_conj = mdl_resp_t$coefficients['conj'],
+    #   resp_by_val = mdl_resp_t$coefficients['resp_by_val'],
+    # )
+    
+    ## re-run model to extract t-values instead of beta values
+    mdl_rule_t <- lm(dfun ~ rule + stim + resp + val + conj + rule_by_val, data=data_dfun_t)
+    mdl_stim_t <- lm(dfun ~ rule + stim + resp + val + conj + stim_by_val, data=data_dfun_t)
+    mdl_resp_t <- lm(dfun ~ rule + stim + resp + val + conj + resp_by_val, data=data_dfun_t)
+    
     # add betas to data table
     rslts_t <- data.table(
       subID = sub,
       tpoint=t,
       time = ts[t+1],
       # rule
-      rule_int = mdl_rule_t$coefficients['Intercept'],
-      rule_rule = mdl_rule_t$coefficients['rule'],
-      rule_stim = mdl_rule_t$coefficients['stim'],
-      rule_resp = mdl_rule_t$coefficients['resp'],
-      rule_val= mdl_rule_t$coefficients['val'],
-      rule_conj = mdl_rule_t$coefficients['conj'],
-      rule_by_val = mdl_rule_t$coefficients['rule_by_val'],
-      
+      rule_int = coef(summary(mdl_rule_t))['(Intercept)', 't value'],
+      rule_rule = coef(summary(mdl_rule_t))['rule', 't value'],
+      rule_stim = coef(summary(mdl_rule_t))['stim', 't value'],
+      rule_resp = coef(summary(mdl_rule_t))['resp', 't value'],
+      rule_val = coef(summary(mdl_rule_t))['val', 't value'],
+      rule_conj = coef(summary(mdl_rule_t))['conj', 't value'],
+      rule_by_val = coef(summary(mdl_rule_t))['rule_by_val', 't value'],
+
       # stim
-      stim_int = mdl_stim_t$coefficients['Intercept'],
-      stim_rule = mdl_stim_t$coefficients['rule'],
-      stim_stim = mdl_stim_t$coefficients['stim'],
-      stim_resp = mdl_stim_t$coefficients['resp'],
-      stim_val = mdl_stim_t$coefficients['val'],
-      stim_conj = mdl_stim_t$coefficients['conj'],
-      stim_by_val = mdl_stim_t$coefficients['stim_by_val'],
-      
+      stim_int = coef(summary(mdl_stim_t))['(Intercept)', 't value'],
+      stim_rule = coef(summary(mdl_stim_t))['rule', 't value'],
+      stim_stim = coef(summary(mdl_stim_t))['stim', 't value'],
+      stim_resp = coef(summary(mdl_stim_t))['resp', 't value'],
+      stim_val = coef(summary(mdl_stim_t))['val', 't value'],
+      stim_conj = coef(summary(mdl_stim_t))['conj', 't value'],
+      stim_by_val = coef(summary(mdl_stim_t))['stim_by_val', 't value'],
+
       # resp
-      resp_int = mdl_resp_t$coefficients['Intercept'],
-      resp_rule = mdl_resp_t$coefficients['rule'],
-      resp_stim = mdl_resp_t$coefficients['stim'],
-      resp_resp = mdl_resp_t$coefficients['resp'],
-      resp_val = mdl_resp_t$coefficients['val'],
-      resp_conj = mdl_resp_t$coefficients['conj'],
-      resp_by_val = mdl_resp_t$coefficients['resp_by_val'],
+      resp_int = coef(summary(mdl_resp_t))['(Intercept)', 't value'],
+      resp_rule = coef(summary(mdl_resp_t))['rule', 't value'],
+      resp_stim = coef(summary(mdl_resp_t))['stim', 't value'],
+      resp_resp = coef(summary(mdl_resp_t))['resp', 't value'],
+      resp_val = coef(summary(mdl_resp_t))['val', 't value'],
+      resp_conj = coef(summary(mdl_resp_t))['conj', 't value'],
+      resp_by_val = coef(summary(mdl_resp_t))['resp_by_val', 't value']
     )
 
+    
     # append data from current time point to overall data table
     rslts_cue_rc_by_val_int <- rbind(rslts_cue_rc_by_val_int, rslts_t)
   }
 }
 
 # save results
-write_csv(rslts_cue_rc, paste0(path_out, 'rslts_cue_rc.csv'))
-write_csv(rslts_cue_rc_by_val_int, paste0(path_out, 'rslts_cue_rc_by_val_int.csv'))
+write_csv(rslts_cue_rc, paste0(path_out, 'rslts_cue_rc_tvals.csv'))
+write_csv(rslts_cue_rc_by_val_int, paste0(path_out, 'rslts_cue_rc_by_val_int_tvals.csv'))
 
