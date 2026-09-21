@@ -136,9 +136,10 @@ p_dat_av_er <- p_dat[!(Subject %in% outliers),
                   by=.(ResponseRule, DistractorValue, RewardPhase)]
 
 p_dat[!(Subject %in% outliers),
-      .(mean=mean(MeanER),
-        sd=sd(MeanER)), 
+      .(mean=mean(MeanER)*100,
+        sd=sd(MeanER)*100), 
       by=c('RewardPhase', 'DistractorValue', 'ResponseRule')]
+
 
 ## Plot data ------------------------------------------------------------------- ### NEED TO REDO FIGURES WITH FAST RESPONSES EXCLUDED
 rt <- ggplot() + 
