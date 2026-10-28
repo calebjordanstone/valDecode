@@ -79,7 +79,7 @@ get_anova_table(aov_rt_2way)
 paired_ttest_rt <- p_dat %>% 
   filter(RewardPhase=='Reward') %>% 
   group_by(ResponseRule) %>% 
-  pairwise_t_test(MeanRT ~ DistractorValue, paired=T)
+  pairwise_t_test(MeanRT ~ DistractorValue, paired=T) 
 paired_ttest_rt
 
 cohends_d_rt <- p_dat %>% 
@@ -90,7 +90,7 @@ cohends_d_rt
 
 # get means
 p_dat_av_rt <- p_dat[, .(gavRT=mean(MeanRT),
-                        seRT=sd(MeanRT)/sqrt(39)), 
+                         seRT=sd(MeanRT)/sqrt(39)), 
                   by=.(ResponseRule, DistractorValue, RewardPhase)]
 
 p_dat[, .(mean=mean(MeanRT),
@@ -101,6 +101,17 @@ p_dat[,
       .(mean=mean(MeanRT),
         sd=sd(MeanRT)), 
       by=c('RewardPhase', 'DistractorValue', 'ResponseRule')]
+
+# get difference scores
+p_dat_wide <- dcast(p_dat, 
+                    Subject + RewardPhase + ResponseRule ~ DistractorValue,
+                    value.var=c('MeanRT'))
+p_dat_diff <- p_dat_wide[, .(RTdiff = high - low),
+                         by=c('Subject', 'RewardPhase', 'ResponseRule')]
+p_dat_diff_av <- p_dat_diff[, .(MeanRTdiff = mean(RTdiff),
+                                sdRTdiff = sd(RTdiff)),
+                            by=c('RewardPhase', 'ResponseRule')]
+
 
 # Error ------------------------------------------------------------------------
 # check assumptions
@@ -129,6 +140,18 @@ aov_er_2way <- p_dat[!(Subject %in% outliers), ] %>%
   adjust_pvalue(method='bonferroni')
 get_anova_table(aov_er_2way)
 
+paired_ttest_er <- p_dat[!(Subject %in% outliers), ] %>% 
+  filter(RewardPhase=='Reward') %>% 
+  group_by(ResponseRule) %>% 
+  pairwise_t_test(MeanER ~ DistractorValue, paired=T) 
+paired_ttest_er
+
+cohends_d_er <- p_dat[!(Subject %in% outliers), ] %>% 
+  filter(RewardPhase=='Reward') %>% 
+  group_by(ResponseRule) %>% 
+  cohens_d(MeanER ~ DistractorValue, paired=T)
+cohends_d_er
+
 # get means
 p_dat_av_er <- p_dat[!(Subject %in% outliers), 
                   .(gavER=mean(MeanER),
@@ -139,6 +162,17 @@ p_dat[!(Subject %in% outliers),
       .(mean=mean(MeanER)*100,
         sd=sd(MeanER)*100), 
       by=c('RewardPhase', 'DistractorValue', 'ResponseRule')]
+
+# get difference scores
+p_dat_wide <- dcast(p_dat[!(Subject %in% outliers), ], 
+                    Subject + RewardPhase + ResponseRule ~ DistractorValue,
+                    value.var=c('MeanER'))
+p_dat_diff <- p_dat_wide[, .(ERdiff = high - low),
+                         by=c('Subject', 'RewardPhase', 'ResponseRule')]
+p_dat_diff_av <- p_dat_diff[, .(MeanERdiff = mean(ERdiff),
+                                sdERdiff = sd(ERdiff)),
+                            by=c('RewardPhase', 'ResponseRule')]
+
 
 
 ## Plot data ------------------------------------------------------------------- ### NEED TO REDO FIGURES WITH FAST RESPONSES EXCLUDED
